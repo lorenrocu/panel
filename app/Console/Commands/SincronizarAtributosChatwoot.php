@@ -45,6 +45,7 @@ class SincronizarAtributosChatwoot extends Command
                         [
                             'id_cliente' => $cliente->id_cliente,
                             'nombre_atributo' => $nombreAtributo,
+                            'attribute_key' => $claveAtributo,
                             'id_account' => $cliente->id_account,
                         ],
                         [

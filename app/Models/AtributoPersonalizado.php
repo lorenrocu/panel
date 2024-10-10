@@ -16,6 +16,7 @@ class AtributoPersonalizado extends Model
         'nombre_atributo',
         'valor_atributo',
         'valor_por_defecto',  // Asegúrate de que esto esté aquí
-        'id_cliente'
+        'id_cliente',
+        'attribute_key'
     ];
 }
