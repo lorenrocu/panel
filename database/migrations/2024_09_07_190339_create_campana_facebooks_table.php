@@ -11,12 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('campanas_facebook', function (Blueprint $table) {
-            // Primero agrega la columna id_cliente
-            $table->unsignedBigInteger('id_cliente')->nullable();  // Puedes ajustar nullable según sea necesario
-
-            // Luego define la clave foránea
-            $table->foreign('id_cliente')->references('id_cliente')->on('clientes')->onDelete('cascade');
+        Schema::create('campanas_facebook', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('id_cliente');  // Ajusta esto según sea necesario
+            $table->string('nombre_campana');          // Otro ejemplo de columna
+            $table->timestamps();
         });
     }
 
