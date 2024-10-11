@@ -13,14 +13,17 @@ class RolesAndPermissionsSeeder extends Seeder
         // Crear permisos
         Permission::create(['name' => 'manage users']);
         Permission::create(['name' => 'view dashboard']);
+        Permission::create(['name' => 'edit content']);  // Ejemplo de otro permiso que puedes añadir
 
         // Crear roles
         $admin = Role::create(['name' => 'admin']);
         $staff = Role::create(['name' => 'staff']);
         $client = Role::create(['name' => 'client']);
 
-        // Asignar permisos a los roles
-        $admin->givePermissionTo('manage users');
+        // Asignar todos los permisos al rol de admin
+        $admin->givePermissionTo(Permission::all());
+
+        // Asignar permisos específicos a otros roles
         $staff->givePermissionTo('view dashboard');
     }
 }
