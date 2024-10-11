@@ -11,16 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('campanas_facebook', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('id_account'); // Llave foránea desde la tabla clientes
-            $table->string('id_campana');
-            $table->string('utm_source')->nullable();
-            $table->string('utm_medium')->nullable();
-            $table->string('utm_term')->nullable();
-            $table->string('utm_content')->nullable();
-            $table->string('utm_campaign')->nullable();
-            $table->timestamps();
+        Schema::table('campanas_facebook', function (Blueprint $table) {
+            // Primero agrega la columna id_cliente
+            $table->unsignedBigInteger('id_cliente')->nullable();  // Puedes ajustar nullable según sea necesario
+
+            // Luego define la clave foránea
+            $table->foreign('id_cliente')->references('id_cliente')->on('clientes')->onDelete('cascade');
         });
     }
 
@@ -29,6 +25,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('campana_facebooks');
+        Schema::table('campanas_facebook', function (Blueprint $table) {
+            // Elimina la clave foránea y la columna en caso de revertir la migración
+            $table->dropForeign(['id_cliente']);
+            $table->dropColumn('id_cliente');
+        });
     }
 };
