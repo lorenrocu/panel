@@ -23,10 +23,25 @@ class CampanaFacebookResource extends Resource
     {
         return auth()->user()->hasRole('admin') || auth()->user()->hasRole('staff');
     }
+
+    public static function getLabel(): string
+    {
+        return 'Campaña Facebook';
+    }
+
+    public static function getPluralLabel(): string
+    {
+        return 'Campañas Facebook';
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return 'Campañas Facebook';
+    }
     
     protected static ?string $model = CampanaFacebook::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-megaphone';
 
     public static function form(Form $form): Form
     {

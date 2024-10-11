@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Notifications\Notification;
+use Filament\Forms\Components\TextInput;
 
 class PlanResource extends Resource
 {
@@ -21,10 +22,25 @@ class PlanResource extends Resource
     {
         return auth()->user()->hasRole('admin');
     }
+
+    public static function getLabel(): string
+    {
+        return 'Plan';
+    }
+
+    public static function getPluralLabel(): string
+    {
+        return 'Planes';
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return 'Planes';
+    }
     
     protected static ?string $model = Plan::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-tag';
 
     public static function form(FilamentForm $form): FilamentForm
     {
