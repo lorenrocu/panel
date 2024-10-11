@@ -13,6 +13,8 @@ class ChatwootController extends Controller
 {
     public function actualizarContactoAtributos(Request $request)
     {
+            // Depurar para asegurarte de que estás recibiendo la solicitud
+    \Log::info('Llamada API recibida', ['data' => $request->all()]);
         // Almacenar el JSON recibido en los logs (contenido completo)
         Log::info('Webhook de Chatwoot recibido', ['data' => $request->all()]);
 
