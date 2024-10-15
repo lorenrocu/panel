@@ -13,9 +13,11 @@ class AddAttributeKeyToAtributosPersonalizadosTable extends Migration
      */
     public function up()
     {
-        Schema::table('atributos_personalizados', function (Blueprint $table) {
-            $table->text('attribute_key')->nullable()->after('nombre_atributo');
-        });
+        if (!Schema::hasColumn('atributos_personalizados', 'attribute_key')) {
+            Schema::table('atributos_personalizados', function (Blueprint $table) {
+                $table->text('attribute_key')->nullable()->after('nombre_atributo');
+            });
+        }
     }
 
     /**
@@ -25,8 +27,10 @@ class AddAttributeKeyToAtributosPersonalizadosTable extends Migration
      */
     public function down()
     {
-        Schema::table('atributos_personalizados', function (Blueprint $table) {
-            $table->dropColumn('attribute_key');
-        });
+        if (Schema::hasColumn('atributos_personalizados', 'attribute_key')) {
+            Schema::table('atributos_personalizados', function (Blueprint $table) {
+                $table->dropColumn('attribute_key');
+            });
+        }
     }
 }

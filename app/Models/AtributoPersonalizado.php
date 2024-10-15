@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder; // Agrega esta línea
 
 class AtributoPersonalizado extends Model
 {
@@ -15,8 +16,16 @@ class AtributoPersonalizado extends Model
         'id_account',
         'nombre_atributo',
         'valor_atributo',
-        'valor_por_defecto',  // Asegúrate de que esto esté aquí
+        'valor_por_defecto',
         'id_cliente',
-        'attribute_key'
+        'attribute_key',
+        'orden', // Asegúrate de incluir 'orden' aquí
     ];
+
+    protected static function booted()
+    {
+        static::addGlobalScope('orden', function (Builder $builder) {
+            $builder->orderBy('orden');
+        });
+    }
 }
