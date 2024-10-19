@@ -53,6 +53,24 @@ class ContactoActualizadoController extends Controller
         // Función para procesar atributos y actualizar si es necesario
         function procesarAtributo($attributeKey, $attributeValue, $accountId)
         {
+            // Si el valor es 'N/A', no hacemos nada y retornamos el array existente
+            if ($attributeValue === 'N/A') {
+                Log::channel('chatwoot_api')->info('El valor de ' . $attributeKey . ' es N/A, se omite el procesamiento.');
+                // Obtener el atributo existente sin modificar
+                $atributo = DB::table('atributos_personalizados')
+                    ->where('id_account', $accountId)
+                    ->where('attribute_key', $attributeKey)
+                    ->first();
+
+                if ($atributo) {
+                    $valorAtributo = $atributo->valor_atributo;
+                    $arrayAtributo = json_decode($valorAtributo, true);
+                    return $arrayAtributo;
+                } else {
+                    return [];
+                }
+            }
+
             $atributo = DB::table('atributos_personalizados')
                 ->where('id_account', $accountId)
                 ->where('attribute_key', $attributeKey)
@@ -91,6 +109,10 @@ class ContactoActualizadoController extends Controller
         {
             $valoresEstaticos = [];
             foreach ($arrayAtributo as $index => $valor) {
+                // Omitir si el valor es 'N/A'
+                if ($valor === 'N/A') {
+                    continue;
+                }
                 $codigo = $prefix . str_pad($index + 1, 2, '0', STR_PAD_LEFT) . '_' . strtolower(str_replace(' ', '-', $valor));
                 $valoresEstaticos[$valor] = $codigo;
             }
@@ -128,7 +150,7 @@ class ContactoActualizadoController extends Controller
 
         // Preparar datos para insertar en la base de datos local
         $datosLabelsLocal = [];
-        foreach ($labelsFaltantesLocal as $valor => $codigoLabel) {
+        foreach ($labelsFaltantesLocal as $codigoLabel) {
             $datosLabelsLocal[] = [
                 'id_account' => $accountId,
                 'valor_label' => $codigoLabel,
@@ -146,7 +168,7 @@ class ContactoActualizadoController extends Controller
 
         // Preparar datos para insertar en la base de datos remota
         $datosLabelsRemoto = [];
-        foreach ($labelsFaltantesRemoto as $valor => $codigoLabel) {
+        foreach ($labelsFaltantesRemoto as $codigoLabel) {
             // Generar un color aleatorio para el label
             $color = '#' . str_pad(dechex(mt_rand(0, 0xFFFFFF)), 6, '0', STR_PAD_LEFT);
 
@@ -197,9 +219,9 @@ class ContactoActualizadoController extends Controller
 
         // **Procesar el contacto actual**
 
-        // Obtener los códigos de labels para el contacto actual
-        $valorLabelTipo = $valoresEstaticosTipo[$tipoContacto] ?? null;
-        $valorLabelEstado = $valoresEstaticosEstado[$estadoContacto] ?? null;
+        // Obtener los códigos de labels para el contacto actual, omitiendo 'N/A'
+        $valorLabelTipo = ($tipoContacto !== 'N/A') ? ($valoresEstaticosTipo[$tipoContacto] ?? null) : null;
+        $valorLabelEstado = ($estadoContacto !== 'N/A') ? ($valoresEstaticosEstado[$estadoContacto] ?? null) : null;
 
         // Ahora hacemos la llamada a la API para obtener el id_conversation
         try {
