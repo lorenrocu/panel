@@ -11,6 +11,8 @@ use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Artisan;
 use Filament\Notifications\Notification;
 use App\Models\Plan;
+use Illuminate\Support\Facades\Log;
+
 
 class EditCliente extends EditRecord
 {
@@ -50,31 +52,31 @@ class EditCliente extends EditRecord
             ->orderBy('orden')
             ->whereNotIn('attribute_key', $this->atributosOcultos)
             ->get();
-
+    
         return $form
             ->schema([
                 Forms\Components\TextInput::make('nombre_empresa')
                     ->required()
                     ->label('Nombre del Cliente'),
-
+    
                 Forms\Components\TextInput::make('email')
                     ->required()
                     ->label('Email'),
-
+    
                 Forms\Components\Select::make('id_plan')
                     ->label('Plan')
                     ->options(Plan::query()->pluck('nombre', 'id_plan'))
                     ->default($this->record->id_plan)
                     ->required(),
-
+    
                 Forms\Components\TextInput::make('token')
                     ->label('Token')
                     ->default($this->record->token),
-
+    
                 Forms\Components\TextInput::make('id_account')
                     ->label('Account ID')
                     ->default($this->record->id_account),
-
+    
                 Forms\Components\Section::make('Atributos Personalizados')
                     ->schema([
                         View::make('forms.custom-attributes')
@@ -84,7 +86,7 @@ class EditCliente extends EditRecord
                     ])
                     ->collapsible(),
             ]);
-    }
+    }    
 
     protected function getActions(): array
     {
@@ -151,6 +153,7 @@ class EditCliente extends EditRecord
 
     public function save(bool $shouldRedirect = true, bool $shouldSendSavedNotification = true): void
     {
+        // Actualizamos los atributos personalizados en la base de datos
         foreach ($this->atributos_personalizados as $idAtributo => $valorPorDefecto) {
             AtributoPersonalizado::where('id', $idAtributo)
                 ->update([
@@ -158,6 +161,45 @@ class EditCliente extends EditRecord
                 ]);
         }
 
+        // Llamamos al método save del padre para guardar el registro principal
         parent::save($shouldRedirect, $shouldSendSavedNotification);
+
+        // Después de guardar, llamamos al comando para eliminar los atributos personalizados
+        Artisan::call('delete:chatwoot-attributes', [
+            '--id_cliente' => $this->record->id_cliente,
+        ]);
+            // Verificar el resultado y notificar al usuario
+            $outputDelete = Artisan::output();
+
+            if (strpos($outputDelete, 'Eliminación de atributos personalizada completada.') !== false) {
+                // Después de eliminar, llamamos al comando para crear los atributos personalizados
+                Artisan::call('create:chatwoot-attributes', [
+                    '--id_cliente' => $this->record->id_cliente,
+                ]);
+        
+                // Capturamos y registramos la salida del comando
+                $outputCreate = Artisan::output();
+                Log::info('Salida del comando create:chatwoot-attributes: ' . $outputCreate);
+        
+                if (strpos($outputCreate, 'Creación de atributos en Fasia completada.') !== false) {
+                    Notification::make()
+                        ->title('Atributos sincronizados')
+                        ->success()
+                        ->body('Los atributos personalizados han sido sincronizados correctamente en Chatwoot.')
+                        ->send();
+                } else {
+                    Notification::make()
+                    ->title('Error al crear atributos')
+                    ->danger()
+                    ->body('Hubo un error al crear los atributos personalizados en Chatwoot. Por favor, revise los logs.')
+                    ->send();
+                }
+            } else {
+                Notification::make()
+                    ->title('Error al eliminar atributos')
+                    ->danger()
+                    ->body('Hubo un error al eliminar los atributos personalizados en Chatwoot. Por favor, revise los logs.')
+                    ->send();
+            }
     }
 }

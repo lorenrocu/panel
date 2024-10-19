@@ -126,6 +126,12 @@ return [
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],
+
+        'chatwoot_api' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/chatwoot_api.log'),
+            'level' => 'debug',
+        ],
     ],
 
 ];

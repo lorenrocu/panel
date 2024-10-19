@@ -19,7 +19,8 @@ class AtributoPersonalizado extends Model
         'valor_por_defecto',
         'id_cliente',
         'attribute_key',
-        'orden', // Asegúrate de incluir 'orden' aquí
+        'orden',
+        'custom_attribute_id',
     ];
 
     protected static function booted()

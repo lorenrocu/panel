@@ -13,6 +13,7 @@ class ChatwootController extends Controller
 {
     public function actualizarContactoAtributos(Request $request)
     {
+        $urlChatwoot = env('URL_CHATWOOT');
             // Depurar para asegurarte de que estás recibiendo la solicitud
     \Log::info('Llamada API recibida', ['data' => $request->all()]);
         // Almacenar el JSON recibido en los logs (contenido completo)
@@ -86,7 +87,7 @@ class ChatwootController extends Controller
                 Log::info('JSON de custom_attributes generado', ['json' => $output]);
 
                 // Construir la URL
-                $url = "https://app.fasiacrm.com/api/v1/accounts/{$accountId}/contacts/{$contactoId}";
+                $url = "{$urlChatwoot}/api/v1/accounts/{$accountId}/contacts/{$contactoId}";
 
                 // Registrar la URL generada en los logs para validación
                 Log::info('URL generada para la solicitud PATCH', ['url' => $url]);

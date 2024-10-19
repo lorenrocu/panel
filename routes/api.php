@@ -3,7 +3,10 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\Api\ContactoActualizadoController;
 use App\Http\Controllers\Api\ChatwootController;
+
+
 
 /*
 |--------------------------------------------------------------------------
@@ -20,4 +23,8 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-Route::post('/v1/chatwoot/actualizar-contacto-atributos', [ChatwootController::class, 'actualizarContactoAtributos']);
+// Ruta para la API de contacto actualizado
+Route::prefix('v1/chatwoot')->group(function () {
+    Route::post('/contacto-actualizado', [ContactoActualizadoController::class, 'contactoActualizado']);
+    Route::post('/actualizar-contacto-atributos', [ChatwootController::class, 'actualizarContactoAtributos']);
+});
