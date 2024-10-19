@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 use App\Models\Cliente;
 use App\Models\LabelPersonalizado;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http; 
+use Illuminate\Support\Facades\Http;
 
 class ContactoActualizadoController extends Controller
 {
@@ -48,158 +48,158 @@ class ContactoActualizadoController extends Controller
             Log::channel('chatwoot_api')->warning('Cliente no encontrado para account_id: ' . $accountId);
         }
 
-        // Definir los valores estáticos para tipo_contacto
-        $valoresEstaticosTipo = [
-            'Prospecto' => 't1_prospecto',
-            'Cliente' => 't2_cliente',
-            'Proveedor' => 't3_proveedor',
-            'Colaborador' => 't4_colaborador',
-            'Spam' => 't5_spam',
-            'Prueba' => 't6_prueba',
-        ];
+        // **Funciones auxiliares**
 
-        // Definir los valores estáticos para estado_contacto
-        $valoresEstaticosEstado = [
-            'No contactado' => 'e1_no-contactado',
-            'Contactado' => 'e2_contactado',
-            'Agendado' => 'e3_agendado',
-            'Agendado fin' => 'e4_agendado-fin',
-            'Cotizado' => 'e5_cotizado',
-            'Ganado sin pago' => 'e6_ganado-sin-pago',
-            'Ganado pagado' => 'e7_ganado-pagado',
-            'Perdido' => 'e8_perdido',
-        ];
+        // Función para procesar atributos y actualizar si es necesario
+        function procesarAtributo($attributeKey, $attributeValue, $accountId)
+        {
+            $atributo = DB::table('atributos_personalizados')
+                ->where('id_account', $accountId)
+                ->where('attribute_key', $attributeKey)
+                ->first();
 
-        // Crear valor para "valor_label" basado en tipo_contacto y estado_contacto
-        if (array_key_exists($tipoContacto, $valoresEstaticosTipo)) {
-            $valorLabelTipo = $valoresEstaticosTipo[$tipoContacto];
-        } else {
-            $ultimoRegistroTipo = LabelPersonalizado::where('id_account', $accountId)->orderBy('id', 'desc')->first();
-            $correlativoTipo = $ultimoRegistroTipo ? intval(substr($ultimoRegistroTipo->valor_label, 1)) + 1 : 6;
-            $valorLabelTipo = 't' . $correlativoTipo . '_' . strtolower($tipoContacto);
-        }
+            if ($atributo) {
+                $valorAtributo = $atributo->valor_atributo;
+                Log::channel('chatwoot_api')->info('Valor del atributo ' . $attributeKey . ':', ['valor_atributo' => $valorAtributo]);
 
-        if (array_key_exists($estadoContacto, $valoresEstaticosEstado)) {
-            $valorLabelEstado = $valoresEstaticosEstado[$estadoContacto];
-        } else {
-            $ultimoRegistroEstado = LabelPersonalizado::where('id_account', $accountId)->orderBy('id', 'desc')->first();
-            $correlativoEstado = $ultimoRegistroEstado ? intval(substr($ultimoRegistroEstado->valor_label, 1)) + 1 : 9;
-            $valorLabelEstado = 'e' . $correlativoEstado . '_' . strtolower($estadoContacto);
-        }
+                // Parsear el JSON para obtener el array
+                $arrayAtributo = json_decode($valorAtributo, true);
 
-        // Verificar si ya existe un registro con este valor_label en la base de datos local
-        // Solo crear etiquetas si los valores no son 'N/A'
-        if ($tipoContacto !== 'N/A') {
-            $registroExistenteTipo = LabelPersonalizado::where('id_account', $accountId)
-                                    ->where('valor_label', $valorLabelTipo)
-                                    ->first();
+                // Verificar si el valor recibido no está en el array
+                if (!in_array($attributeValue, $arrayAtributo)) {
+                    // Agregar el nuevo valor al array
+                    $arrayAtributo[] = $attributeValue;
 
-            if (!$registroExistenteTipo) {
-                LabelPersonalizado::create([
-                    'id_account' => $accountId,
-                    'valor_label' => $valorLabelTipo,
-                    'id_cliente' => $cliente ? $cliente->id_cliente : null,
-                ]);
+                    // Actualizar el valor_atributo en la base de datos
+                    DB::table('atributos_personalizados')
+                        ->where('id_account', $accountId)
+                        ->where('attribute_key', $attributeKey)
+                        ->update(['valor_atributo' => json_encode($arrayAtributo)]);
+
+                    Log::channel('chatwoot_api')->info('Nuevo ' . $attributeKey . ' agregado a atributos_personalizados', [$attributeKey => $attributeValue]);
+                }
+
+                return $arrayAtributo;
+            } else {
+                Log::channel('chatwoot_api')->warning('No se encontró el atributo ' . $attributeKey . ' para account_id: ' . $accountId);
+                return [];
             }
         }
 
-        if ($estadoContacto !== 'N/A') {
-            $registroExistenteEstado = LabelPersonalizado::where('id_account', $accountId)
-                                    ->where('valor_label', $valorLabelEstado)
-                                    ->first();
-
-            if (!$registroExistenteEstado) {
-                LabelPersonalizado::create([
-                    'id_account' => $accountId,
-                    'valor_label' => $valorLabelEstado,
-                    'id_cliente' => $cliente ? $cliente->id_cliente : null,
-                ]);
+        // Función para generar códigos de labels
+        function generarCodigosLabels($arrayAtributo, $prefix)
+        {
+            $valoresEstaticos = [];
+            foreach ($arrayAtributo as $index => $valor) {
+                $codigo = $prefix . str_pad($index + 1, 2, '0', STR_PAD_LEFT) . '_' . strtolower(str_replace(' ', '-', $valor));
+                $valoresEstaticos[$valor] = $codigo;
             }
+            return $valoresEstaticos;
         }
 
-        // Generar un color aleatorio para el campo "color"
-        $color = '#' . dechex(rand(0x000000, 0xFFFFFF));
+        // **Procesamiento de atributos**
 
-        // Inicializar variable para rastrear si se insertó algún label en PostgreSQL
+        // Procesar 'tipo_contacto' y 'estado_contacto'
+        $arrayTipoContacto = procesarAtributo('tipo_contacto', $tipoContacto, $accountId);
+        $arrayEstadoContacto = procesarAtributo('estado_contacto', $estadoContacto, $accountId);
+
+        // Generar códigos de labels
+        $valoresEstaticosTipo = generarCodigosLabels($arrayTipoContacto, 't');
+        $valoresEstaticosEstado = generarCodigosLabels($arrayEstadoContacto, 'e');
+
+        // **Optimización de consultas**
+
+        // Obtener todos los labels existentes en la base de datos local y remota
+        $existingLocalLabels = LabelPersonalizado::where('id_account', $accountId)
+            ->pluck('valor_label')
+            ->toArray();
+
+        $existingRemoteLabels = DB::connection('pgsql_chatwoot')
+            ->table('labels')
+            ->where('account_id', $accountId)
+            ->pluck('title')
+            ->toArray();
+
+        // Combinar todos los labels que necesitamos
+        $labelsNecesarios = array_merge($valoresEstaticosTipo, $valoresEstaticosEstado);
+
+        // Determinar los labels que faltan en la base de datos local
+        $labelsFaltantesLocal = array_diff($labelsNecesarios, $existingLocalLabels);
+
+        // Preparar datos para insertar en la base de datos local
+        $datosLabelsLocal = [];
+        foreach ($labelsFaltantesLocal as $valor => $codigoLabel) {
+            $datosLabelsLocal[] = [
+                'id_account' => $accountId,
+                'valor_label' => $codigoLabel,
+                'id_cliente' => $cliente ? $cliente->id_cliente : null,
+            ];
+        }
+
+        // Insertar labels faltantes en la base de datos local
+        if (!empty($datosLabelsLocal)) {
+            LabelPersonalizado::insert($datosLabelsLocal);
+        }
+
+        // Determinar los labels que faltan en la base de datos remota
+        $labelsFaltantesRemoto = array_diff($labelsNecesarios, $existingRemoteLabels);
+
+        // Preparar datos para insertar en la base de datos remota
+        $datosLabelsRemoto = [];
+        foreach ($labelsFaltantesRemoto as $valor => $codigoLabel) {
+            // Generar un color aleatorio para el label
+            $color = '#' . str_pad(dechex(mt_rand(0, 0xFFFFFF)), 6, '0', STR_PAD_LEFT);
+
+            $datosLabelsRemoto[] = [
+                'title' => $codigoLabel,
+                'description' => $codigoLabel,
+                'color' => $color,
+                'show_on_sidebar' => 't',
+                'account_id' => $accountId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        // Insertar labels faltantes en la base de datos remota
         $labelInserted = false;
+        if (!empty($datosLabelsRemoto)) {
+            DB::connection('pgsql_chatwoot')->table('labels')->insert($datosLabelsRemoto);
+            $labelInserted = true;
 
-        // Verificar si el label ya existe en la base de datos PostgreSQL antes de insertar
-        try {
-            // Verificar si el label de tipo_contacto ya existe en la base de datos PostgreSQL
-            if ($tipoContacto !== 'N/A') {
-                $labelTipoExistente = DB::connection('pgsql_chatwoot')
-                    ->table('labels')
-                    ->where('title', $valorLabelTipo)
-                    ->where('account_id', $accountId)
-                    ->first();
-
-                if (!$labelTipoExistente) {
-                    DB::connection('pgsql_chatwoot')->table('labels')->insert([
-                        'title' => $valorLabelTipo,
-                        'description' => $valorLabelTipo,
-                        'color' => $color,
-                        'show_on_sidebar' => 't',
-                        'account_id' => $accountId,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                    Log::channel('chatwoot_api')->info('Label de tipo_contacto insertado correctamente en PostgreSQL.');
-                    $labelInserted = true;
-                } else {
-                    Log::channel('chatwoot_api')->info('Label de tipo_contacto ya existe en PostgreSQL.');
-                }
+            // Registrar en el log los labels insertados
+            foreach ($datosLabelsRemoto as $labelData) {
+                Log::channel('chatwoot_api')->info('Label insertado correctamente en PostgreSQL.', ['label' => $labelData['title']]);
             }
-
-            // Verificar si el label de estado_contacto ya existe en la base de datos PostgreSQL
-            if ($estadoContacto !== 'N/A') {
-                $labelEstadoExistente = DB::connection('pgsql_chatwoot')
-                    ->table('labels')
-                    ->where('title', $valorLabelEstado)
-                    ->where('account_id', $accountId)
-                    ->first();
-
-                if (!$labelEstadoExistente) {
-                    DB::connection('pgsql_chatwoot')->table('labels')->insert([
-                        'title' => $valorLabelEstado,
-                        'description' => $valorLabelEstado,
-                        'color' => $color,
-                        'show_on_sidebar' => 't',
-                        'account_id' => $accountId,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                    Log::channel('chatwoot_api')->info('Label de estado_contacto insertado correctamente en PostgreSQL.');
-                    $labelInserted = true;
-                } else {
-                    Log::channel('chatwoot_api')->info('Label de estado_contacto ya existe en PostgreSQL.');
-                }
-            }
-
-            // Después de insertar correctamente en PostgreSQL, realizar la llamada a la API
-            if ($labelInserted) {
-                try {
-                    $apiResponse = Http::post("{$urlPuppeter}/api/clear-cache", [
-                        'account_id' => $accountId,
-                    ]);
-
-                    if ($apiResponse->successful()) {
-                        Log::channel('chatwoot_api')->info('Llamada a la API clear-cache realizada con éxito.', [
-                            'account_id' => $accountId,
-                        ]);
-                    } else {
-                        Log::channel('chatwoot_api')->error('Error al llamar a la API clear-cache.', [
-                            'account_id' => $accountId,
-                            'response' => $apiResponse->body(),
-                        ]);
-                    }
-                } catch (\Exception $e) {
-                    Log::channel('chatwoot_api')->error('Excepción al llamar a la API clear-cache: ' . $e->getMessage());
-                }
-            }
-
-        } catch (\Exception $e) {
-            Log::channel('chatwoot_api')->error('Error al insertar o verificar los labels en la base de datos PostgreSQL: ' . $e->getMessage());
         }
+
+        // **Llamar a la API clear-cache si se insertó algún label nuevo**
+        if ($labelInserted) {
+            try {
+                $apiResponse = Http::post("{$urlPuppeter}/api/clear-cache", [
+                    'account_id' => $accountId,
+                ]);
+
+                if ($apiResponse->successful()) {
+                    Log::channel('chatwoot_api')->info('Llamada a la API clear-cache realizada con éxito.', [
+                        'account_id' => $accountId,
+                    ]);
+                } else {
+                    Log::channel('chatwoot_api')->error('Error al llamar a la API clear-cache.', [
+                        'account_id' => $accountId,
+                        'response' => $apiResponse->body(),
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::channel('chatwoot_api')->error('Excepción al llamar a la API clear-cache: ' . $e->getMessage());
+            }
+        }
+
+        // **Procesar el contacto actual**
+
+        // Obtener los códigos de labels para el contacto actual
+        $valorLabelTipo = $valoresEstaticosTipo[$tipoContacto] ?? null;
+        $valorLabelEstado = $valoresEstaticosEstado[$estadoContacto] ?? null;
 
         // Ahora hacemos la llamada a la API para obtener el id_conversation
         try {
@@ -223,15 +223,7 @@ class ContactoActualizadoController extends Controller
                     ]);
 
                     // Ahora enviar los labels a la API de etiquetas usando el id_conversation
-                    $labelsToSend = [];
-
-                    if ($tipoContacto !== 'N/A') {
-                        $labelsToSend[] = $valorLabelTipo;
-                    }
-
-                    if ($estadoContacto !== 'N/A') {
-                        $labelsToSend[] = $valorLabelEstado;
-                    }
+                    $labelsToSend = array_filter([$valorLabelTipo, $valorLabelEstado]);
 
                     // Solo enviar los labels si hay alguno válido
                     if (!empty($labelsToSend)) {
