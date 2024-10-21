@@ -53,8 +53,11 @@ class ContactoActualizadoController extends Controller
         // Función para procesar atributos y actualizar si es necesario
         function procesarAtributo($attributeKey, $attributeValue, $accountId)
         {
-            // Si el valor es 'N/A', no hacemos nada y retornamos el array existente
-            if ($attributeValue === 'N/A' || $attributeValue === 'Sin Seleccionar') {
+            // Convertir el valor a minúsculas para comparación insensible a mayúsculas
+            $attributeValueLower = mb_strtolower($attributeValue);
+
+            // Si el valor es 'n/a' o 'sin seleccionar', no hacemos nada y retornamos el array existente
+            if ($attributeValueLower === 'n/a' || $attributeValueLower === 'sin seleccionar') {
                 Log::channel('chatwoot_api')->info('El valor de ' . $attributeKey . ' es N/A o Sin Seleccionar, se omite el procesamiento.');
                 // Obtener el atributo existente sin modificar
                 $atributo = DB::table('atributos_personalizados')
@@ -103,21 +106,29 @@ class ContactoActualizadoController extends Controller
                 return [];
             }
         }
-
+        
         // Función para generar códigos de labels
         function generarCodigosLabels($arrayAtributo, $prefix)
         {
             $valoresEstaticos = [];
-            foreach ($arrayAtributo as $index => $valor) {
-                // Omitir si el valor es 'N/A'
-                if ($valor === 'N/A' || $valor === 'Sin Seleccionar') {
+            $contador = 1; // Iniciar el contador en 1
+            foreach ($arrayAtributo as $valor) {
+                // Convertir el valor a minúsculas para comparación insensible a mayúsculas
+                $valorLower = mb_strtolower($valor);
+
+                // Omitir si el valor es 'n/a' o 'sin seleccionar'
+                if ($valorLower === 'n/a' || $valorLower === 'sin seleccionar') {
                     continue;
                 }
-                $codigo = $prefix . str_pad($index + 1, 2, '0', STR_PAD_LEFT) . '_' . strtolower(str_replace(' ', '-', $valor));
-                $valoresEstaticos[$valor] = $codigo;
+
+                // Generar el código con el contador actual
+                $codigo = $prefix . str_pad($contador, 2, '0', STR_PAD_LEFT) . '_' . strtolower(str_replace(' ', '-', $valor));
+                $valoresEstaticos[$valorLower] = $codigo; // Usar clave en minúsculas
+
+                $contador++; // Incrementar el contador solo después de procesar un valor válido
             }
             return $valoresEstaticos;
-        }
+        }       
 
         // **Procesamiento de atributos**
 
@@ -219,9 +230,15 @@ class ContactoActualizadoController extends Controller
 
         // **Procesar el contacto actual**
 
-        // Obtener los códigos de labels para el contacto actual, omitiendo 'N/A'
-        $valorLabelTipo = ($tipoContacto !== 'N/A') ? ($valoresEstaticosTipo[$tipoContacto] ?? null) : null;
-        $valorLabelEstado = ($estadoContacto !== 'N/A') ? ($valoresEstaticosEstado[$estadoContacto] ?? null) : null;
+        // Convertir los valores a minúsculas para comparación
+        $tipoContactoLower = mb_strtolower($tipoContacto);
+        $estadoContactoLower = mb_strtolower($estadoContacto);
+
+        // Obtener los códigos de labels para el contacto actual, omitiendo 'N/A' y 'Sin Seleccionar'
+        $omitidos = ['n/a', 'sin seleccionar'];
+
+        $valorLabelTipo = (!in_array($tipoContactoLower, $omitidos)) ? ($valoresEstaticosTipo[$tipoContactoLower] ?? null) : null;
+        $valorLabelEstado = (!in_array($estadoContactoLower, $omitidos)) ? ($valoresEstaticosEstado[$estadoContactoLower] ?? null) : null;
 
         // Ahora hacemos la llamada a la API para obtener el id_conversation
         try {
@@ -244,24 +261,22 @@ class ContactoActualizadoController extends Controller
                         'token' => $token,
                     ]);
 
-                    // Ahora enviar los labels a la API de etiquetas usando el id_conversation
-                    $labelsToSend = array_filter([$valorLabelTipo, $valorLabelEstado]);
+                    // **Aquí aplicamos array_values para reindexar el array**
+                    $labelsToSend = array_values(array_filter([$valorLabelTipo, $valorLabelEstado]));
 
-                    // Solo enviar los labels si hay alguno válido
-                    if (!empty($labelsToSend)) {
-                        $responseLabels = Http::withHeaders([
-                            'api_access_token' => $token,
-                        ])->post("{$urlChatwoot}/api/v1/accounts/{$accountId}/conversations/{$idConversation}/labels", ['labels' => $labelsToSend]);
+                    // **Siempre enviar los labels a la API, incluso si el array está vacío**
+                    $responseLabels = Http::withHeaders([
+                        'api_access_token' => $token,
+                    ])->post("{$urlChatwoot}/api/v1/accounts/{$accountId}/conversations/{$idConversation}/labels", ['labels' => $labelsToSend]);
 
-                        if ($responseLabels->successful()) {
-                            Log::channel('chatwoot_api')->info('Labels enviados correctamente a la API para la conversación: ' . $idConversation, [
-                                'labels' => $labelsToSend,
-                            ]);
-                        } else {
-                            Log::channel('chatwoot_api')->error('Error al enviar los labels a la API.', [
-                                'response' => $responseLabels->body(),
-                            ]);
-                        }
+                    if ($responseLabels->successful()) {
+                        Log::channel('chatwoot_api')->info('Labels enviados correctamente a la API para la conversación: ' . $idConversation, [
+                            'labels' => $labelsToSend,
+                        ]);
+                    } else {
+                        Log::channel('chatwoot_api')->error('Error al enviar los labels a la API.', [
+                            'response' => $responseLabels->body(),
+                        ]);
                     }
                 } else {
                     Log::channel('chatwoot_api')->warning('No se encontró id_conversation para contact_id: ' . $id);
