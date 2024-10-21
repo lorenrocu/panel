@@ -54,8 +54,8 @@ class ContactoActualizadoController extends Controller
         function procesarAtributo($attributeKey, $attributeValue, $accountId)
         {
             // Si el valor es 'N/A', no hacemos nada y retornamos el array existente
-            if ($attributeValue === 'N/A') {
-                Log::channel('chatwoot_api')->info('El valor de ' . $attributeKey . ' es N/A, se omite el procesamiento.');
+            if ($attributeValue === 'N/A' || $attributeValue === 'Sin Seleccionar') {
+                Log::channel('chatwoot_api')->info('El valor de ' . $attributeKey . ' es N/A o Sin Seleccionar, se omite el procesamiento.');
                 // Obtener el atributo existente sin modificar
                 $atributo = DB::table('atributos_personalizados')
                     ->where('id_account', $accountId)
@@ -110,7 +110,7 @@ class ContactoActualizadoController extends Controller
             $valoresEstaticos = [];
             foreach ($arrayAtributo as $index => $valor) {
                 // Omitir si el valor es 'N/A'
-                if ($valor === 'N/A') {
+                if ($valor === 'N/A' || $valor === 'Sin Seleccionar') {
                     continue;
                 }
                 $codigo = $prefix . str_pad($index + 1, 2, '0', STR_PAD_LEFT) . '_' . strtolower(str_replace(' ', '-', $valor));
