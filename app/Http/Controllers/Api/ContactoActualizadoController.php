@@ -106,29 +106,58 @@ class ContactoActualizadoController extends Controller
                 return [];
             }
         }
-        
-        // Función para generar códigos de labels
-        function generarCodigosLabels($arrayAtributo, $prefix)
+
+        // **Función actualizada para generar códigos de labels**
+
+        // Función para generar códigos de labels, verificando labels existentes
+        function generarCodigosLabels($arrayAtributo, $prefix, &$existingLabelsMapping)
         {
             $valoresEstaticos = [];
-            $contador = 1; // Iniciar el contador en 1
+            $contador = 1; // Iniciar el contador
+
+            // Extraer códigos existentes para evitar duplicados
+            $existingCodes = [];
+            foreach ($existingLabelsMapping as $valorLower => $codigoLabel) {
+                $parts = explode('_', $codigoLabel, 2);
+                if (count($parts) == 2) {
+                    $existingCodes[] = $parts[0]; // Solo el código (e.g., 't01')
+                }
+            }
+
             foreach ($arrayAtributo as $valor) {
-                // Convertir el valor a minúsculas para comparación insensible a mayúsculas
                 $valorLower = mb_strtolower($valor);
 
-                // Omitir si el valor es 'n/a' o 'sin seleccionar'
+                // Omitir 'n/a' o 'sin seleccionar'
                 if ($valorLower === 'n/a' || $valorLower === 'sin seleccionar') {
                     continue;
                 }
 
-                // Generar el código con el contador actual
-                $codigo = $prefix . str_pad($contador, 2, '0', STR_PAD_LEFT) . '_' . strtolower(str_replace(' ', '-', $valor));
-                $valoresEstaticos[$valorLower] = $codigo; // Usar clave en minúsculas
+                // Verificar si este valor de atributo ya tiene un código
+                if (isset($existingLabelsMapping[$valorLower])) {
+                    $codigoLabel = $existingLabelsMapping[$valorLower];
+                } else {
+                    // Asignar un nuevo código
+                    // Encontrar el siguiente código disponible
+                    do {
+                        $nextCode = $prefix . str_pad($contador, 2, '0', STR_PAD_LEFT);
+                        $contador++;
+                    } while (in_array($nextCode, $existingCodes));
 
-                $contador++; // Incrementar el contador solo después de procesar un valor válido
+                    // Generar el label completo
+                    $codigoLabel = $nextCode . '_' . strtolower(str_replace(' ', '-', $valor));
+
+                    // Actualizar los mapeos
+                    $existingLabelsMapping[$valorLower] = $codigoLabel;
+                    $existingCodes[] = $nextCode;
+                }
+
+                $valoresEstaticos[$valorLower] = $codigoLabel;
             }
+
             return $valoresEstaticos;
-        }       
+        }
+
+        // **Fin de la función actualizada**
 
         // **Procesamiento de atributos**
 
@@ -136,13 +165,9 @@ class ContactoActualizadoController extends Controller
         $arrayTipoContacto = procesarAtributo('tipo_contacto', $tipoContacto, $accountId);
         $arrayEstadoContacto = procesarAtributo('estado_contacto', $estadoContacto, $accountId);
 
-        // Generar códigos de labels
-        $valoresEstaticosTipo = generarCodigosLabels($arrayTipoContacto, 't');
-        $valoresEstaticosEstado = generarCodigosLabels($arrayEstadoContacto, 'e');
+        // **Construir mapeo de labels existentes**
 
-        // **Optimización de consultas**
-
-        // Obtener todos los labels existentes en la base de datos local y remota
+        // Obtener labels existentes de las bases de datos local y remota
         $existingLocalLabels = LabelPersonalizado::where('id_account', $accountId)
             ->pluck('valor_label')
             ->toArray();
@@ -153,10 +178,40 @@ class ContactoActualizadoController extends Controller
             ->pluck('title')
             ->toArray();
 
-        // Combinar todos los labels que necesitamos
+        // Combinar labels locales y remotos
+        $allExistingLabels = array_unique(array_merge($existingLocalLabels, $existingRemoteLabels));
+
+        // Construir un mapeo de valores de atributos a códigos de labels
+        $existingLabelsMapping = [];
+
+        foreach ($allExistingLabels as $labelTitle) {
+            // Dividir el labelTitle en el primer '_'
+            $parts = explode('_', $labelTitle, 2);
+            if (count($parts) == 2) {
+                $code = $parts[0];
+                $valor = $parts[1];
+
+                // Revertir las transformaciones para obtener el valor del atributo
+                $valorAttribute = str_replace('-', ' ', $valor);
+                $valorLower = mb_strtolower($valorAttribute);
+
+                // Almacenar en el mapeo
+                $existingLabelsMapping[$valorLower] = $labelTitle; // El título completo del label incluye código y valor
+            }
+        }
+
+        // **Generar códigos de labels utilizando el mapeo existente**
+
+        // Generar códigos de labels para 'tipo_contacto' y 'estado_contacto' usando el mapeo de labels existentes
+        $valoresEstaticosTipo = generarCodigosLabels($arrayTipoContacto, 't', $existingLabelsMapping);
+        $valoresEstaticosEstado = generarCodigosLabels($arrayEstadoContacto, 'e', $existingLabelsMapping);
+
+        // **Continuación del código original**
+
+        // Preparar labels necesarios
         $labelsNecesarios = array_merge($valoresEstaticosTipo, $valoresEstaticosEstado);
 
-        // Determinar los labels que faltan en la base de datos local
+        // Determinar labels que faltan en la base de datos local
         $labelsFaltantesLocal = array_diff($labelsNecesarios, $existingLocalLabels);
 
         // Preparar datos para insertar en la base de datos local
@@ -174,7 +229,7 @@ class ContactoActualizadoController extends Controller
             LabelPersonalizado::insert($datosLabelsLocal);
         }
 
-        // Determinar los labels que faltan en la base de datos remota
+        // Determinar labels que faltan en la base de datos remota
         $labelsFaltantesRemoto = array_diff($labelsNecesarios, $existingRemoteLabels);
 
         // Preparar datos para insertar en la base de datos remota
@@ -261,7 +316,7 @@ class ContactoActualizadoController extends Controller
                         'token' => $token,
                     ]);
 
-                    // **Aquí aplicamos array_values para reindexar el array**
+                    // **Aplicar los labels a la conversación**
                     $labelsToSend = array_values(array_filter([$valorLabelTipo, $valorLabelEstado]));
 
                     // **Siempre enviar los labels a la API, incluso si el array está vacío**
