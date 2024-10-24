@@ -15,6 +15,9 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Notifications\Notification;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\DatePicker; // Importa DatePicker
+use Filament\Forms\Components\TimePicker; // Importa TimePicker
 
 class PlanResource extends Resource
 {

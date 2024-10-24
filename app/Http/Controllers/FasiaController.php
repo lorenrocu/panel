@@ -44,7 +44,7 @@ class FasiaController extends Controller
                     \Log::info('UTMs encontradas:', ['utms' => $utms]);
 
                     // Consultar el token para el id_account
-                    $token = DB::table('cliente')
+                    $token = DB::table('clientes')
                                ->where('id_account', $accountId)
                                ->value('token');
 
