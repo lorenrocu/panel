@@ -33,9 +33,9 @@ class FasiaController extends Controller
                 $currentDate = Carbon::now()->format('Y-m-d');
                 \Log::info('Fecha actual:', ['fecha' => $currentDate]);
 
-                // Consultar la base de datos para las UTMs
+                // Consultar la base de datos para las UTMs (ahora busca en registro_id en lugar de id)
                 $utms = DB::table('registro_ingresos_web')
-                          ->where('resgistro_id', $capturedValue)
+                          ->where('registro_id', $capturedValue) // Modificado para buscar en registro_id
                           ->where('id_account', $accountId)
                           ->where('fecha', $currentDate)
                           ->value('utms');
@@ -74,7 +74,7 @@ class FasiaController extends Controller
                 // Consulta a la base de datos campanas_utm_facebook
                 $utmData = DB::table('campanas_utm_facebook')
                             ->where('id_account', $accountId)
-                            ->where('resgistro_id', $capturedValue)
+                            ->where('id', $capturedValue)
                             ->first();
 
                 if ($utmData) {
