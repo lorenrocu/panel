@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Api\ContactoActualizadoController;
 use App\Http\Controllers\Api\ChatwootController;
+use App\Http\Controllers\FasiaController;
+
 
 
 
@@ -28,3 +30,6 @@ Route::prefix('v1/chatwoot')->group(function () {
     Route::post('/contacto-actualizado', [ContactoActualizadoController::class, 'contactoActualizado']);
     Route::post('/actualizar-contacto-atributos', [ChatwootController::class, 'actualizarContactoAtributos']);
 });
+// routes/api.php
+Route::post('/validar-utm-fasia', [FasiaController::class, 'validarUtmFasia']);
+

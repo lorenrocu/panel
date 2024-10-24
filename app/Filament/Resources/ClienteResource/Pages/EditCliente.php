@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Artisan;
 use Filament\Notifications\Notification;
 use App\Models\Plan;
 use Illuminate\Support\Facades\Log;
+use Filament\Facades\Filament;
+
 
 
 class EditCliente extends EditRecord
@@ -33,6 +35,15 @@ class EditCliente extends EditRecord
         'fbclid',
     ];
 
+    protected $listeners = ['refreshComponent'];
+
+public function refreshComponent()
+{
+    $this->emit('refresh');
+    $this->record->refresh();
+}
+
+
     public function mount($record): void
     {
         parent::mount($record);
@@ -52,7 +63,13 @@ class EditCliente extends EditRecord
             ->orderBy('orden')
             ->whereNotIn('attribute_key', $this->atributosOcultos)
             ->get();
-    
+        
+        // Obtenemos solo los atributos del cliente actual que tienen datos en la columna valor_atributo
+        $atributosConValores = AtributoPersonalizado::where('id_cliente', $this->record->id_cliente)
+            ->whereNotNull('valor_atributo')           // El atributo debe tener un valor no nulo
+            ->where('valor_atributo', '!=', '')        // El valor no debe estar vacío
+            ->pluck('nombre_atributo', 'id');          // Obtenemos los atributos con valor
+        
         return $form
             ->schema([
                 Forms\Components\TextInput::make('nombre_empresa')
@@ -83,10 +100,49 @@ class EditCliente extends EditRecord
                             ->viewData([
                                 'atributosPersonalizados' => $atributosPersonalizados,
                             ]),
+
+                            Forms\Components\Checkbox::make('mostrar_atributos')
+    ->label('Mostrar atributos personalizados')
+    ->reactive(),  // El checkbox será reactivo para detectar cambios
+    
+                        // Nuevo grupo de campos
+                        Forms\Components\Group::make()
+                            ->schema([
+                                // Select del lado izquierdo
+                                Forms\Components\Select::make('atributo_seleccionado')
+                                    ->label('Atributo')
+                                    ->options($atributosConValores)  // Mostrar solo atributos con valor no nulo y no vacío
+                                    ->required()
+                                    ->reactive() // El campo será reactivo para actualizar el valor
+                                    ->afterStateUpdated(function ($state, callable $set) {
+                                        // Obtener el valor del atributo seleccionado y actualizar el campo de valor
+                                        $atributo = AtributoPersonalizado::find($state);
+                                        if ($atributo) {
+                                            $set('valor_atributo', $atributo->valor_atributo);
+                                        }
+                                    }),
+    
+                                // Campo de texto del lado derecho para el valor
+                                Forms\Components\TextInput::make('valor_atributo')
+                                ->label('Valor')
+                                ->required()
+                                ->reactive()
+                                ->afterStateUpdated(function ($state, callable $set) {
+                                    // Convertimos los valores de la BD en una lista de elementos
+                                    $atributo = AtributoPersonalizado::find($state);
+                                    if ($atributo) {
+                                        $set('valor_atributo', json_encode($atributo->valor_atributo));
+                                    }
+                                })
+                                ->view('components.drag-and-drop-list') 
+                            ])
+                            ->columns(2) // Dos columnas para los dos campos (select y text input)
+                            //->visible(fn ($get) => $get('mostrar_atributos')), // Solo será visible si el checkbox está marcado
                     ])
                     ->collapsible(),
             ]);
-    }    
+    }
+      
 
     protected function getActions(): array
     {
@@ -150,6 +206,57 @@ class EditCliente extends EditRecord
         // Refrescamos el registro para asegurarnos de que el orden está actualizado
         $this->record->refresh();
     }
+
+    public function saveNewArrayOrder($data)
+    {
+        // Registrar los datos recibidos desde el frontend
+        Log::info('Datos recibidos desde el frontend:', $data);
+    
+        // Extraer el ID y los nuevos valores
+        $id = $data['id'];
+        $newValues = json_encode($data['new_values']); // Convertimos el array en JSON
+    
+        Log::info('ID recibido:', ['id' => $id]);
+        Log::info('Nuevo valor (JSON) recibido:', ['new_values' => $newValues]);
+    
+        // Intentar actualizar la base de datos
+        try {
+            $updated = AtributoPersonalizado::where('id', $id)
+                ->update(['valor_atributo' => $newValues]);
+    
+            if ($updated) {
+                Log::info('Actualización exitosa en la base de datos para el ID:', ['id' => $id]);
+                // Emitir un evento Livewire para refrescar la vista del componente
+                $this->emit('refreshComponent');
+    
+                // Retornar una respuesta de éxito
+                return [
+                    'success' => true,
+                    'new_values' => $newValues,
+                ];
+            } else {
+                Log::warning('No se pudo actualizar el registro en la base de datos para el ID:', ['id' => $id]);
+                return [
+                    'success' => false,
+                    'message' => 'No se pudo actualizar el registro.',
+                ];
+            }
+        } catch (\Exception $e) {
+            Log::error('Error al actualizar la base de datos:', ['error' => $e->getMessage()]);
+            return [
+                'success' => false,
+                'message' => 'Ocurrió un error al actualizar la base de datos.',
+            ];
+        }
+    }
+    
+
+    
+    
+    
+    
+    
+
 
     public function save(bool $shouldRedirect = true, bool $shouldSendSavedNotification = true): void
     {
