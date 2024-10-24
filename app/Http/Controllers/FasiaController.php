@@ -35,7 +35,7 @@ class FasiaController extends Controller
 
                 // Consultar la base de datos para las UTMs
                 $utms = DB::table('registro_ingresos_web')
-                          ->where('id', $capturedValue)
+                          ->where('resgistro_id', $capturedValue)
                           ->where('id_account', $accountId)
                           ->where('fecha', $currentDate)
                           ->value('utms');
@@ -74,7 +74,7 @@ class FasiaController extends Controller
                 // Consulta a la base de datos campanas_utm_facebook
                 $utmData = DB::table('campanas_utm_facebook')
                             ->where('id_account', $accountId)
-                            ->where('id', $capturedValue)
+                            ->where('resgistro_id', $capturedValue)
                             ->first();
 
                 if ($utmData) {
