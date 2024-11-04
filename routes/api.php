@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Api\ContactoActualizadoController;
 use App\Http\Controllers\Api\ChatwootController;
+use App\Http\Controllers\Api\AttributeController;
 use App\Http\Controllers\FasiaController;
 use App\Http\Controllers\RegistroIngresosWebController;
 
@@ -34,5 +35,5 @@ Route::prefix('v1/chatwoot')->group(function () {
 // routes/api.php
 Route::post('/validar-utm-fasia', [FasiaController::class, 'validarUtmFasia']);
 Route::post('/registro-ingresos-web', [RegistroIngresosWebController::class, 'store']);
-
+Route::delete('/delete-attribute/{id}', [AttributeController::class, 'delete']);
 

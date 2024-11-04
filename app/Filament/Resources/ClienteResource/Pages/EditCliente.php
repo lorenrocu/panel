@@ -101,9 +101,77 @@ public function refreshComponent()
                                 'atributosPersonalizados' => $atributosPersonalizados,
                             ]),
 
+                                    // Agregar esto justo después del View::make
+        Forms\Components\Actions::make([
+            Forms\Components\Actions\Action::make('crear_atributo_personalizado')
+                ->label('Nuevo atributo personalizado')
+                ->action(function (array $data) {
+                    AtributoPersonalizado::create($data);
+                })
+                ->form([
+                    Forms\Components\Select::make('id_cliente')
+                        ->label('Cliente')
+                        ->relationship('cliente', 'nombre_empresa')
+                        ->required()
+                        ->reactive()
+                        ->afterStateUpdated(function ($state, callable $set) {
+                            $cliente = \App\Models\Cliente::find($state);
+                            if ($cliente) {
+                                $set('id_account', $cliente->id_account);
+                            }
+                        }),
+
+                    Forms\Components\Hidden::make('id_account')->required(),
+
+                    Forms\Components\TextInput::make('nombre_atributo')
+                        ->label('Nombre del Atributo')
+                        ->required()
+                        ->reactive()
+                        ->debounce(1000)
+                        ->afterStateUpdated(function ($state, callable $set) {
+                            $set('attribute_key', \Str::snake($state));
+                        }),
+
+                    Forms\Components\TextInput::make('attribute_key')
+                        ->label('Clave del Atributo')
+                        ->required(),
+
+                    Forms\Components\Select::make('tipo_atributo')
+                        ->label('Tipo de Atributo')
+                        ->options([
+                            'text' => 'Text',
+                            'list' => 'List',
+                        ])
+                        ->required()
+                        ->reactive()
+                        ->afterStateUpdated(function ($state, callable $set) {
+                            if ($state === 'text') {
+                                $set('valor_atributo', null);
+                            }
+                        }),
+
+                    Forms\Components\Repeater::make('opciones')
+                        ->label('Opciones para el List')
+                        ->schema([
+                            Forms\Components\TextInput::make('opcion')->label('Opción')->required(),
+                        ])
+                        ->visible(fn ($get) => $get('tipo_atributo') === 'list')
+                        ->required(fn ($get) => $get('tipo_atributo') === 'list')
+                        ->columns(1)
+                        ->afterStateUpdated(function ($state, callable $set) {
+                            $set('valor_atributo', collect($state)->pluck('opcion')->toJson());
+                        }),
+
+                    Forms\Components\Hidden::make('valor_atributo')->required(),
+                ])
+                ->modalHeading('Crear Nuevo Atributo Personalizado')
+                ->modalButton('Guardar')
+                ->modalWidth('lg'),
+        ]),
+
                             Forms\Components\Checkbox::make('mostrar_atributos')
-    ->label('Mostrar atributos personalizados')
-    ->reactive(),  // El checkbox será reactivo para detectar cambios
+                    ->label('Mostrar atributos personalizados')
+                    ->reactive(),  // El checkbox será reactivo para detectar cambios
     
                         // Nuevo grupo de campos
                         Forms\Components\Group::make()
@@ -112,7 +180,7 @@ public function refreshComponent()
                                 Forms\Components\Select::make('atributo_seleccionado')
                                     ->label('Atributo')
                                     ->options($atributosConValores)  // Mostrar solo atributos con valor no nulo y no vacío
-                                    ->required()
+                                    //->required()
                                     ->reactive() // El campo será reactivo para actualizar el valor
                                     ->afterStateUpdated(function ($state, callable $set) {
                                         // Obtener el valor del atributo seleccionado y actualizar el campo de valor
@@ -125,7 +193,7 @@ public function refreshComponent()
                                 // Campo de texto del lado derecho para el valor
                                 Forms\Components\TextInput::make('valor_atributo')
                                 ->label('Valor')
-                                ->required()
+                                //->required()
                                 ->reactive()
                                 ->afterStateUpdated(function ($state, callable $set) {
                                     // Convertimos los valores de la BD en una lista de elementos

@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\Http;
 
 class EliminarAtributosChatwoot extends Command
 {
-    protected $signature = 'delete:chatwoot-attributes {--id_cliente=}';
+    // Añadimos la opción para recibir custom_attribute_id además del id_cliente
+    protected $signature = 'delete:chatwoot-attributes {--id_cliente=} {--custom_attribute_id=}';
 
     protected $description = 'Elimina los atributos personalizados de los clientes en Chatwoot';
 
@@ -20,8 +21,8 @@ class EliminarAtributosChatwoot extends Command
     public function handle()
     {
         try {
-                
             $idCliente = $this->option('id_cliente');
+            $customAttributeId = $this->option('custom_attribute_id'); // Nuevo parámetro opcional
 
             if (!$idCliente) {
                 $this->error('Debe proporcionar el ID del cliente usando la opción --id_cliente=');
@@ -36,43 +37,52 @@ class EliminarAtributosChatwoot extends Command
             }
 
             $baseUrl = env('URL_CHATWOOT');
+            $requestHeaders = [
+                'api_access_token' => $cliente->token,
+                'Accept' => 'application/json',
+            ];
 
-            // Obtener todos los atributos personalizados del cliente
-            $atributosPersonalizados = $cliente->atributosPersonalizados;
-
-            foreach ($atributosPersonalizados as $atributo) {
-                $customAttributeId = $atributo->custom_attribute_id;
-
-                if (!$customAttributeId) {
-                    $this->error("El atributo '{$atributo->nombre_atributo}' no tiene 'custom_attribute_id'.");
-                    continue;
-                }
-
-                // Usar custom_attribute_id en la URL
+            // Si custom_attribute_id está presente, eliminamos solo ese atributo
+            if ($customAttributeId) {
                 $url = "{$baseUrl}/api/v1/accounts/{$cliente->id_account}/custom_attribute_definitions/{$customAttributeId}";
-
                 $this->info("Enviando petición DELETE a URL: $url");
 
-                // Construir las cabeceras de la petición
-                $requestHeaders = [
-                    'api_access_token' => $cliente->token,
-                    'Accept' => 'application/json',
-                ];
-
-                // Enviar la petición
                 $response = Http::withHeaders($requestHeaders)->delete($url);
 
                 if ($response->successful()) {
-                    // No eliminamos el atributo de la base de datos local
-                    $this->info("Atributo '{$atributo->nombre_atributo}' eliminado en Chatwoot exitosamente.");
+                    $this->info("Atributo con custom_attribute_id '{$customAttributeId}' eliminado en Chatwoot exitosamente.");
                 } else {
                     $statusCode = $response->status();
                     $responseBody = $response->body();
-                    $this->error("Error al eliminar el atributo '{$atributo->nombre_atributo}'. Código de estado: {$statusCode}. Respuesta: {$responseBody}");
+                    $this->error("Error al eliminar el atributo. Código de estado: {$statusCode}. Respuesta: {$responseBody}");
                 }
-            }
+            } else {
+                // Si no se pasa custom_attribute_id, eliminamos todos los atributos del cliente (funcionalidad original)
+                $atributosPersonalizados = $cliente->atributosPersonalizados;
 
-            $this->info('Eliminación de atributos personalizada completada.');
+                foreach ($atributosPersonalizados as $atributo) {
+                    $customAttributeId = $atributo->custom_attribute_id;
+
+                    if (!$customAttributeId) {
+                        $this->error("El atributo '{$atributo->nombre_atributo}' no tiene 'custom_attribute_id'.");
+                        continue;
+                    }
+
+                    $url = "{$baseUrl}/api/v1/accounts/{$cliente->id_account}/custom_attribute_definitions/{$customAttributeId}";
+                    $this->info("Enviando petición DELETE a URL: $url");
+
+                    $response = Http::withHeaders($requestHeaders)->delete($url);
+
+                    if ($response->successful()) {
+                        $this->info("Atributo '{$atributo->nombre_atributo}' eliminado en Chatwoot exitosamente.");
+                    } else {
+                        $statusCode = $response->status();
+                        $responseBody = $response->body();
+                        $this->error("Error al eliminar el atributo '{$atributo->nombre_atributo}'. Código de estado: {$statusCode}. Respuesta: {$responseBody}");
+                    }
+                }
+                $this->info('Eliminación de atributos personalizada completada.');
+            }
         } catch (\Exception $e) {
             $this->error('Error al ejecutar el comando: ' . $e->getMessage());
             \Log::error('Error en EliminarAtributosChatwoot: ' . $e->getMessage());

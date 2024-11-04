@@ -29,4 +29,9 @@ class Cliente extends Model
         {
             return $this->hasMany(AtributoPersonalizado::class, 'id_cliente', 'id_cliente');
         }
+
+        public function cliente()
+        {
+            return $this->belongsTo(Cliente::class, 'id_cliente');
+        }
 }

@@ -12,6 +12,10 @@ class AtributoPersonalizado extends Model
 
     protected $table = 'atributos_personalizados';
 
+    protected $casts = [
+        'opciones' => 'array', // Asegura que Laravel maneje este campo como un array
+    ];
+
     protected $fillable = [
         'id_account',
         'nombre_atributo',
@@ -28,5 +32,10 @@ class AtributoPersonalizado extends Model
         static::addGlobalScope('orden', function (Builder $builder) {
             $builder->orderBy('orden');
         });
+    }
+
+    public function cliente()
+    {
+        return $this->belongsTo(Cliente::class, 'id_cliente');
     }
 }
