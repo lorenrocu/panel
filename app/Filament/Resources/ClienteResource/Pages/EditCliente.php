@@ -13,6 +13,7 @@ use Filament\Notifications\Notification;
 use App\Models\Plan;
 use Illuminate\Support\Facades\Log;
 use Filament\Facades\Filament;
+use Filament\Pages\Actions\Action;
 
 
 
@@ -230,6 +231,10 @@ public function refreshComponent()
                         ->body('Sincronización completada para ' . $this->record->nombre_empresa)
                         ->send();
                 }),
+                Action::make('Conectar con Google')
+                ->url(route('google.authenticate'))
+                ->openUrlInNewTab(true)
+                ->label('Conectar con Google'),
         ];
     }
 
@@ -317,14 +322,6 @@ public function refreshComponent()
             ];
         }
     }
-    
-
-    
-    
-    
-    
-    
-
 
     public function save(bool $shouldRedirect = true, bool $shouldSendSavedNotification = true): void
     {

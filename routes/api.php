@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\ChatwootController;
 use App\Http\Controllers\Api\AttributeController;
 use App\Http\Controllers\FasiaController;
 use App\Http\Controllers\RegistroIngresosWebController;
+use App\Http\Controllers\GoogleAuthController;
+
 
 
 
@@ -36,4 +38,9 @@ Route::prefix('v1/chatwoot')->group(function () {
 Route::post('/validar-utm-fasia', [FasiaController::class, 'validarUtmFasia']);
 Route::post('/registro-ingresos-web', [RegistroIngresosWebController::class, 'store']);
 Route::delete('/delete-attribute/{id}', [AttributeController::class, 'delete']);
+
+
+Route::get('/google/authenticate', [GoogleAuthController::class, 'authenticate'])->name('google.authenticate');
+Route::get('/google/callback', [GoogleAuthController::class, 'callback'])->name('google.callback');
+Route::post('/google/store-contact', [GoogleAuthController::class, 'storeContact'])->name('google.store-contact');
 
