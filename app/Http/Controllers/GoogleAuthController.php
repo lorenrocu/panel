@@ -60,19 +60,16 @@ class GoogleAuthController extends Controller
     
         return response()->json(['message' => 'Authenticated successfully']);
     }
-    
 
-    public function storeContact(Request $request)
+    private function getClientForCustomer($id_cliente)
     {
-        $id_cliente = $request->get('id_cliente');
-    
         // Recuperar el token de la base de datos
         $googleToken = GoogleToken::where('id_cliente', $id_cliente)->first();
-    
+
         if (!$googleToken) {
-            return response()->json(['message' => 'No token found for this client'], 404);
+            throw new \Exception('No token found for this client');
         }
-    
+
         $client = new Client();
         $client->setAuthConfig(storage_path('app/google/credentials.json'));
         $client->setAccessToken([
@@ -81,40 +78,63 @@ class GoogleAuthController extends Controller
             'expires_in' => $googleToken->expires_at->timestamp - now()->timestamp,
             'created' => now()->timestamp,
         ]);
-    
+
         if ($client->isAccessTokenExpired()) {
-            // Refrescar el token si es necesario
-            $refreshToken = $googleToken->refresh_token;
-            if ($refreshToken) {
-                $client->refreshToken($refreshToken);
+            if ($client->getRefreshToken()) {
+                $newToken = $client->fetchAccessTokenWithRefreshToken($client->getRefreshToken());
+
                 // Actualizar el token en la base de datos
-                $newToken = $client->getAccessToken();
                 $googleToken->access_token = $newToken['access_token'];
                 $googleToken->expires_at = now()->addSeconds($newToken['expires_in']);
                 $googleToken->save();
             } else {
-                return response()->json(['message' => 'Refresh token not available'], 401);
+                throw new \Exception('Refresh token not available or expired. Please re-authenticate.');
             }
         }
+
+        return $client;
+    }    
+
+    public function storeContact(Request $request)
+    {
+        try {
+            // Usar la función getClientForCustomer para obtener el cliente de Google
+            $client = $this->getClientForCustomer($request->get('id_cliente'));
     
-        $peopleService = new PeopleService($client);
+            // Crear el servicio de People API usando el cliente válido
+            $peopleService = new PeopleService($client);
     
-        $newContact = new PeopleService\Person([
-            'names' => [
-                ['givenName' => $request->first_name, 'familyName' => $request->last_name]
-            ],
-            'emailAddresses' => [
-                ['value' => $request->email]
-            ],
-            'phoneNumbers' => [
-                ['value' => $request->phone]
-            ]
-        ]);
+            // Crear el contacto utilizando los datos recibidos del Request
+            $newContact = new PeopleService\Person([
+                'names' => [
+                    [
+                        'givenName' => $request->first_name,
+                        'familyName' => $request->last_name
+                    ]
+                ],
+                'emailAddresses' => [
+                    [
+                        'value' => $request->email
+                    ]
+                ],
+                'phoneNumbers' => [
+                    [
+                        'value' => $request->phone
+                    ]
+                ]
+            ]);
     
-        $result = $peopleService->people->createContact($newContact);
+            // Crear el contacto usando el servicio de Google
+            $result = $peopleService->people->createContact($newContact);
     
-        return response()->json($result);
+            // Retornar la respuesta en caso de éxito
+            return response()->json($result, 201);
+        } catch (\Exception $e) {
+            // Capturar cualquier error y devolver un mensaje con el código de error 500
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
     }
+    
 
     public function saveContact(Request $request)
     {
