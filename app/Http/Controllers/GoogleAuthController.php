@@ -137,6 +137,34 @@ class GoogleAuthController extends Controller
     // Now, $googleToken->expires_at is a Carbon instance
     $expiresIn = $googleToken->expires_at->timestamp - now()->timestamp;
 
+        // Verificar si el token ha expirado o está a punto de expirar
+        if ($expiresIn <= 0) {
+            // El token ha expirado, intentar refrescarlo
+            $client = new Client();
+            $client->setAuthConfig(storage_path('app/google/credentials.json'));
+            $client->setAccessToken([
+                'access_token' => $googleToken->access_token,
+                'refresh_token' => $googleToken->refresh_token,
+                'expires_in' => $expiresIn,
+                'created' => now()->timestamp,
+            ]);
+    
+            if ($client->getRefreshToken()) {
+                // Refrescar el token de acceso
+                $newToken = $client->fetchAccessTokenWithRefreshToken($client->getRefreshToken());
+    
+                // Actualizar el token en la base de datos
+                $googleToken->access_token = $newToken['access_token'];
+                $googleToken->expires_at = now()->addSeconds($newToken['expires_in']);
+                $googleToken->save();
+    
+                // Recalcular expiresIn con el nuevo expires_at
+                $expiresIn = $googleToken->expires_at->timestamp - now()->timestamp;
+            } else {
+                return response()->json(['message' => 'El token de refresco no está disponible o ha expirado. Por favor, reautentique.'], 401);
+            }
+        }
+
     $client = new Client();
     $client->setAuthConfig(storage_path('app/google/credentials.json'));
     $client->setAccessToken([
