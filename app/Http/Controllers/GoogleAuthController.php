@@ -31,15 +31,10 @@ class GoogleAuthController extends Controller
         if (isset($tokenData['error'])) {
             return response()->json(['error' => $tokenData['error']], 400);
         }
-    
-        // Verificar que el usuario esté autenticado
-        if (!auth()->check()) {
-            return redirect('/login'); // Redirige al usuario a iniciar sesión
-        }
-    
+        $clienteId = $request->get('cliente_id');
         // Guarda los tokens en la base de datos
         GoogleToken::updateOrCreate(
-            ['id_cliente' => auth()->id()],
+            ['id_cliente' => auth()->id()], // Cambiar según cómo identifiques al cliente
             [
                 'access_token' => $tokenData['access_token'],
                 'refresh_token' => $tokenData['refresh_token'] ?? null,
@@ -49,7 +44,6 @@ class GoogleAuthController extends Controller
     
         return response()->json(['message' => 'Authenticated successfully']);
     }
-    
 
     public function storeContact(Request $request)
     {
