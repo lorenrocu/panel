@@ -6,7 +6,6 @@ use Google\Client;
 use Google\Service\PeopleService;
 use Illuminate\Http\Request;
 use App\Models\GoogleToken;
-use Illuminate\Support\Str;
 
 class GoogleAuthController extends Controller
 {
@@ -18,43 +17,20 @@ class GoogleAuthController extends Controller
         $client->setRedirectUri(route('google.callback'));
         $client->setAccessType('offline');
     
+        // Obtener el id_cliente del parámetro de consulta
         $id_cliente = $request->query('id_cliente');
     
-        // Generar un token de estado único
-        $csrfToken = Str::random(40);
-    
-        // Almacenar el token y el id_cliente en la sesión
-        session(['google_oauth_state' => $csrfToken, 'google_oauth_id_cliente' => $id_cliente]);
-    
-        // Incluir ambos en el parámetro state
-        $state = json_encode(['csrf_token' => $csrfToken, 'id_cliente' => $id_cliente]);
-        $state = base64_encode($state);
-        $client->setState($state);
+        // Establecer el parámetro state con el id_cliente
+        $client->setState($id_cliente);
     
         $authUrl = $client->createAuthUrl();
         return redirect($authUrl);
     }
-    
 
     public function callback(Request $request)
     {
         $client = new \Google\Client();
         $client->setAuthConfig(storage_path('app/google/credentials.json'));
-    
-        // Decodificar y verificar el parámetro state
-        $stateData = json_decode(base64_decode($request->input('state')), true);
-    
-        if (!$stateData || !isset($stateData['csrf_token']) || !isset($stateData['id_cliente'])) {
-            return response()->json(['error' => 'Invalid state parameter'], 400);
-        }
-    
-        // Validar el token CSRF
-        if ($stateData['csrf_token'] !== session('google_oauth_state')) {
-            return response()->json(['error' => 'Invalid CSRF token'], 400);
-        }
-    
-        // Obtener el id_cliente
-        $id_cliente = $stateData['id_cliente'];
     
         $tokenData = $client->fetchAccessTokenWithAuthCode($request->code);
     
@@ -62,7 +38,15 @@ class GoogleAuthController extends Controller
             return response()->json(['error' => $tokenData['error']], 400);
         }
     
-        // Guarda los tokens en la base de datos
+        // Recuperar el id_cliente del parámetro state
+        $id_cliente = $request->input('state');
+    
+        // Verificar que id_cliente no sea nulo
+        if (!$id_cliente) {
+            return response()->json(['error' => 'Client ID not found in state parameter'], 400);
+        }
+    
+        // Guarda los tokens en la base de datos usando id_cliente
         GoogleToken::updateOrCreate(
             ['id_cliente' => $id_cliente],
             [
@@ -72,12 +56,8 @@ class GoogleAuthController extends Controller
             ]
         );
     
-        // Limpiar los datos de la sesión
-        session()->forget(['google_oauth_state', 'google_oauth_id_cliente']);
-    
         return response()->json(['message' => 'Authenticated successfully']);
     }
-    
     
 
     public function storeContact(Request $request)
