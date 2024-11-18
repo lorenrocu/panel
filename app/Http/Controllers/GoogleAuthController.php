@@ -6,6 +6,7 @@ use Google\Client;
 use Google\Service\PeopleService;
 use Illuminate\Http\Request;
 use App\Models\GoogleToken;
+use Illuminate\Support\Str;
 
 class GoogleAuthController extends Controller
 {
