@@ -134,12 +134,15 @@ class GoogleAuthController extends Controller
         return response()->json(['message' => 'No token found for this client'], 404);
     }
 
+    // Now, $googleToken->expires_at is a Carbon instance
+    $expiresIn = $googleToken->expires_at->timestamp - now()->timestamp;
+
     $client = new Client();
     $client->setAuthConfig(storage_path('app/google/credentials.json'));
     $client->setAccessToken([
         'access_token' => $googleToken->access_token,
         'refresh_token' => $googleToken->refresh_token,
-        'expires_in' => $googleToken->expires_at->timestamp - now()->timestamp,
+        'expires_in' => $expiresIn,
         'created' => now()->timestamp,
     ]);
 

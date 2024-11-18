@@ -21,8 +21,8 @@ class GoogleToken extends Model
         return $this->belongsTo(Cliente::class, 'id_cliente', 'id_cliente');
     }
 
-    protected $dates = [
-        'expires_at',
+    protected $casts = [
+        'expires_at' => 'datetime',
     ];
 
     public $timestamps = true;
