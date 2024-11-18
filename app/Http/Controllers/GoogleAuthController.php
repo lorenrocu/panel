@@ -16,25 +16,10 @@ class GoogleAuthController extends Controller
         $client->addScope(PeopleService::CONTACTS);
         $client->setRedirectUri(route('google.callback'));
         $client->setAccessType('offline');
-    
-        // Validar que el id_cliente fue enviado
-        $validated = $request->validate([
-            'id_cliente' => 'required|exists:clientes,id_cliente', // Validar el cliente
-        ]);
-    
-        // Generar la URL de autenticación de Google
+
         $authUrl = $client->createAuthUrl();
-    
-        // Agregar el id_cliente como parámetro adicional
-        $authUrl .= '&state=' . $validated['id_cliente']; // Usamos 'state' que es recomendado por Google
-    
-        // Debug: Verifica la URL generada antes de redirigir
-        \Log::info("Redirigiendo a la URL de Google: " . $authUrl);
-    
-        // Redirigir al usuario
-        return redirect()->away($authUrl); // `away` asegura que sea una URL externa
+        return redirect($authUrl);
     }
-    
 
     public function callback(Request $request)
     {
