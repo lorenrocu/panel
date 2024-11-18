@@ -115,46 +115,61 @@ class GoogleAuthController extends Controller
         return response()->json($result);
     }
 
+    use Illuminate\Support\Facades\Log;
+
     public function saveContact(Request $request)
     {
-        $jsonContent = $request->getContent();
-        $data = json_decode($jsonContent, true);
-    
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            return response()->json(['message' => 'Invalid JSON received'], 400);
-        }
-
-        Log::info('Paso 1: Ingresó al método saveContact');
-        
         // Registrar el JSON entrante en los logs
         Log::info('Paso 2: Datos recibidos en saveContact:', $request->all());
     
-        // Validar los datos entrantes
-        $validatedData = $request->validate([
-            'id_cliente' => 'required',
-            'first_name' => 'required|string',
-            'last_name' => 'nullable|string',
-            'email' => 'required|email',
-            'phone' => 'nullable|string',
-        ]);
+        // Decodificar manualmente el contenido del JSON recibido
+        $data = json_decode($request->getContent(), true);
     
-        Log::info('Paso 3: Datos validados correctamente');
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return response()->json(['message' => 'JSON inválido recibido', 'error' => json_last_error_msg()], 400);
+        }
     
-        $id_cliente = $validatedData['id_cliente'];
+        // Extraer los valores necesarios del JSON recibido
+        $accountId = $data['account']['id'] ?? null;
+        $firstName = $data['name'] ?? null;
+        $email = $data['email'] ?? null;
+        $phoneNumber = $data['phone_number'] ?? null;
+    
+        // Verificar que los datos necesarios estén presentes
+        if (is_null($accountId) || is_null($firstName) || is_null($email) || is_null($phoneNumber)) {
+            return response()->json(['message' => 'Datos insuficientes para procesar la solicitud.'], 400);
+        }
+    
+        // Buscar el id_cliente en la base de datos usando el account_id proporcionado
+        $cliente = Cliente::where('id_account', $accountId)->first();
+    
+        if (!$cliente) {
+            return response()->json(['message' => 'Cliente no encontrado para el account_id proporcionado.'], 404);
+        }
+    
+        $id_cliente = $cliente->id_cliente;
+    
+        // Crear un arreglo para validar los datos antes de proceder con la lógica del token y Google Contacts
+        $validatedData = [
+            'id_cliente' => $id_cliente,
+            'first_name' => $firstName,
+            'last_name' => '', // Dejar last_name vacío ya que no lo estamos recibiendo
+            'email' => $email,
+            'phone' => $phoneNumber,
+        ];
     
         // Recuperar el token de la base de datos
         $googleToken = GoogleToken::where('id_cliente', $id_cliente)->first();
     
         if (!$googleToken) {
-            return response()->json(['message' => 'No token found for this client'], 404);
+            return response()->json(['message' => 'No se encontró un token para este cliente.'], 404);
         }
     
-        // Ahora, $googleToken->expires_at es una instancia de Carbon
+        // Verificar si el token ha expirado
         $expiresIn = $googleToken->expires_at->timestamp - now()->timestamp;
     
-        // Verificar si el token ha expirado o está a punto de expirar
         if ($expiresIn <= 0) {
-            // El token ha expirado, intentar refrescarlo
+            // Refrescar el token si ha expirado
             $client = new Client();
             $client->setAuthConfig(storage_path('app/google/credentials.json'));
             $client->setAccessToken([
@@ -165,7 +180,6 @@ class GoogleAuthController extends Controller
             ]);
     
             if ($client->getRefreshToken()) {
-                // Refrescar el token de acceso
                 $newToken = $client->fetchAccessTokenWithRefreshToken($client->getRefreshToken());
     
                 // Actualizar el token en la base de datos
@@ -180,6 +194,7 @@ class GoogleAuthController extends Controller
             }
         }
     
+        // Configurar el servicio de Google Client
         $client = new Client();
         $client->setAuthConfig(storage_path('app/google/credentials.json'));
         $client->setAccessToken([
@@ -199,7 +214,7 @@ class GoogleAuthController extends Controller
                 $googleToken->expires_at = now()->addSeconds($newToken['expires_in']);
                 $googleToken->save();
             } else {
-                return response()->json(['message' => 'Refresh token not available or expired. Please re-authenticate.'], 401);
+                return response()->json(['message' => 'El token de refresco no está disponible o ha expirado. Por favor, reautentique.'], 401);
             }
         }
     
@@ -211,14 +226,14 @@ class GoogleAuthController extends Controller
             'names' => [
                 [
                     'givenName' => $validatedData['first_name'],
-                    'familyName' => $validatedData['last_name'] ?? '',
+                    'familyName' => $validatedData['last_name'],
                 ],
             ],
             'emailAddresses' => [
                 ['value' => $validatedData['email']],
             ],
             'phoneNumbers' => [
-                ['value' => $validatedData['phone'] ?? ''],
+                ['value' => $validatedData['phone']],
             ],
         ]);
     
@@ -226,11 +241,12 @@ class GoogleAuthController extends Controller
             // Guardar el contacto en Google Contacts
             $result = $peopleService->people->createContact($newContact);
     
-            return response()->json(['message' => 'Contact saved successfully', 'contact' => $result], 201);
+            return response()->json(['message' => 'Contacto guardado exitosamente', 'contact' => $result], 201);
         } catch (\Exception $e) {
             // Manejar errores de la API de Google
-            return response()->json(['message' => 'Failed to save contact', 'error' => $e->getMessage()], 500);
+            return response()->json(['message' => 'No se pudo guardar el contacto', 'error' => $e->getMessage()], 500);
         }
     }
+    
     
 }
