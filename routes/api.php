@@ -39,7 +39,6 @@ Route::post('/validar-utm-fasia', [FasiaController::class, 'validarUtmFasia']);
 Route::post('/registro-ingresos-web', [RegistroIngresosWebController::class, 'store']);
 Route::delete('/delete-attribute/{id}', [AttributeController::class, 'delete']);
 
-
 Route::get('/google/authenticate', [GoogleAuthController::class, 'authenticate'])->name('google.authenticate');
 Route::get('/google/callback', [GoogleAuthController::class, 'callback'])->name('google.callback');
 Route::post('/google/store-contact', [GoogleAuthController::class, 'storeContact'])->name('google.store-contact');
