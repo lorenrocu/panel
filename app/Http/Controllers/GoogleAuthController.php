@@ -123,18 +123,11 @@ class GoogleAuthController extends Controller
         if (json_last_error() !== JSON_ERROR_NONE) {
             return response()->json(['message' => 'Invalid JSON received'], 400);
         }
-    
-        // Ahora puedes registrar los datos
-        file_put_contents(storage_path('logs/debug.log'), "Datos recibidos:\n" . json_encode($data, JSON_PRETTY_PRINT) . "\n", FILE_APPEND);
 
         Log::info('Paso 1: Ingresó al método saveContact');
-    
-        // Guardar en archivo para más seguridad
-        file_put_contents(storage_path('logs/debug.log'), "Paso 1: Ingresó al método saveContact\n", FILE_APPEND);
         
         // Registrar el JSON entrante en los logs
         Log::info('Paso 2: Datos recibidos en saveContact:', $request->all());
-        file_put_contents(storage_path('logs/debug.log'), "Paso 2: Datos recibidos:\n" . json_encode($request->all(), JSON_PRETTY_PRINT) . "\n", FILE_APPEND);
     
         // Validar los datos entrantes
         $validatedData = $request->validate([
@@ -146,7 +139,6 @@ class GoogleAuthController extends Controller
         ]);
     
         Log::info('Paso 3: Datos validados correctamente');
-        file_put_contents(storage_path('logs/debug.log'), "Paso 3: Datos validados correctamente\n", FILE_APPEND);
     
         $id_cliente = $validatedData['id_cliente'];
     
