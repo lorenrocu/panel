@@ -11,19 +11,13 @@ class GoogleAuthController extends Controller
 {
     public function authenticate(Request $request)
     {
-        $client = new \Google\Client();
+        $client = new Client();
         $client->setAuthConfig(storage_path('app/google/credentials.json'));
-        $client->addScope(\Google\Service\PeopleService::CONTACTS);
+        $client->addScope(PeopleService::CONTACTS);
         $client->setRedirectUri(route('google.callback'));
-    
-        // Validar que el id_cliente fue enviado
-        $validated = $request->validate([
-            'id_cliente' => 'required|exists:clientes,id_cliente',
-        ]);
-    
-        // Agregar id_cliente a la URL de autenticación
-        $authUrl = $client->createAuthUrl() . '&id_cliente=' . $validated['id_cliente'];
-    
+        $client->setAccessType('offline');
+
+        $authUrl = $client->createAuthUrl();
         return redirect($authUrl);
     }
 
