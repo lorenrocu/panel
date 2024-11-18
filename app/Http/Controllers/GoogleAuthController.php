@@ -117,6 +117,16 @@ class GoogleAuthController extends Controller
 
     public function saveContact(Request $request)
     {
+        $jsonContent = $request->getContent();
+        $data = json_decode($jsonContent, true);
+    
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return response()->json(['message' => 'Invalid JSON received'], 400);
+        }
+    
+        // Ahora puedes registrar los datos
+        file_put_contents(storage_path('logs/debug.log'), "Datos recibidos:\n" . json_encode($data, JSON_PRETTY_PRINT) . "\n", FILE_APPEND);
+
         Log::info('Paso 1: Ingresó al método saveContact');
     
         // Guardar en archivo para más seguridad
