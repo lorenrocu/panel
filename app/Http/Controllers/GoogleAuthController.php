@@ -34,7 +34,7 @@ class GoogleAuthController extends Controller
     
         // Guarda los tokens en la base de datos
         GoogleToken::updateOrCreate(
-            ['cliente_id' => auth()->id()], // Cambiar según cómo identifiques al cliente
+            ['id_cliente' => auth()->id()], // Cambiar según cómo identifiques al cliente
             [
                 'access_token' => $tokenData['access_token'],
                 'refresh_token' => $tokenData['refresh_token'] ?? null,
