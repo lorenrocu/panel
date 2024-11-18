@@ -10,7 +10,7 @@ class GoogleToken extends Model
     use HasFactory;
 
     protected $fillable = [
-        'cliente_id',
+        'id_cliente',
         'access_token',
         'refresh_token',
         'expires_at',
