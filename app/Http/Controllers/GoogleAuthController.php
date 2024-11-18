@@ -11,13 +11,19 @@ class GoogleAuthController extends Controller
 {
     public function authenticate(Request $request)
     {
-        $client = new Client();
+        $client = new \Google\Client();
         $client->setAuthConfig(storage_path('app/google/credentials.json'));
-        $client->addScope(PeopleService::CONTACTS);
+        $client->addScope(\Google\Service\PeopleService::CONTACTS);
         $client->setRedirectUri(route('google.callback'));
-        $client->setAccessType('offline');
-
-        $authUrl = $client->createAuthUrl();
+    
+        // Validar que el id_cliente fue enviado
+        $validated = $request->validate([
+            'id_cliente' => 'required|exists:clientes,id_cliente',
+        ]);
+    
+        // Agregar id_cliente a la URL de autenticación
+        $authUrl = $client->createAuthUrl() . '&id_cliente=' . $validated['id_cliente'];
+    
         return redirect($authUrl);
     }
 
@@ -26,15 +32,21 @@ class GoogleAuthController extends Controller
         $client = new \Google\Client();
         $client->setAuthConfig(storage_path('app/google/credentials.json'));
     
+        // Obtén el token de Google
         $tokenData = $client->fetchAccessTokenWithAuthCode($request->code);
     
         if (isset($tokenData['error'])) {
             return response()->json(['error' => $tokenData['error']], 400);
         }
     
-        // Guarda los tokens en la base de datos
+        // Validar que el id_cliente existe
+        $validated = $request->validate([
+            'id_cliente' => 'required|exists:clientes,id_cliente', // Verifica que el cliente existe
+        ]);
+    
+        // Guarda el token en la base de datos
         GoogleToken::updateOrCreate(
-            ['id_cliente' => auth()->id()], // Cambiar según cómo identifiques al cliente
+            ['id_cliente' => $validated['id_cliente']], // Usar el id_cliente validado
             [
                 'access_token' => $tokenData['access_token'],
                 'refresh_token' => $tokenData['refresh_token'] ?? null,
@@ -42,8 +54,8 @@ class GoogleAuthController extends Controller
             ]
         );
     
-        return response()->json(['message' => 'Authenticated successfully']);
-    }
+        return response()->json(['message' => 'Token guardado exitosamente']);
+    }    
 
     public function storeContact(Request $request)
     {
