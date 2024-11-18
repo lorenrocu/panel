@@ -115,8 +115,6 @@ class GoogleAuthController extends Controller
         return response()->json($result);
     }
 
-    use Illuminate\Support\Facades\Log;
-
     public function saveContact(Request $request)
     {
         // Registrar el JSON entrante en los logs
