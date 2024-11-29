@@ -249,17 +249,22 @@ class GoogleAuthController extends Controller
         // Configurar el servicio de People API
         $peopleService = new PeopleService($client);
     
-        // Crear el nuevo contacto
+        // Verificar si el email está presente para agregar la empresa al nombre
+        $givenName = $validatedData['first_name'] . ' - Prospecto'; // Nombre base
+        if ($email) {
+            // Si el email está presente, agregar la empresa
+            $givenName .= ' - ' . $empresa;
+        }
+    
+        // Crear el nuevo contacto con el nombre modificado (agregar la empresa solo si hay email)
         $newContact = new PeopleService\Person([
             'names' => [
                 [
-                    'givenName' => $validatedData['first_name'] . ' - Prospecto',
+                    'givenName' => $givenName,  // Nombre ajustado según la condición
                     'familyName' => $validatedData['last_name'],
                 ],
             ],
-            'emailAddresses' => [
-                ['value' => $validatedData['email']],
-            ],
+            'emailAddresses' => $email ? [['value' => $validatedData['email']]] : [], // Solo agregar el email si está presente
             'phoneNumbers' => [
                 ['value' => $validatedData['phone']],
             ],
@@ -275,6 +280,7 @@ class GoogleAuthController extends Controller
             return response()->json(['message' => 'No se pudo guardar el contacto', 'error' => $e->getMessage()], 500);
         }
     }
+    
     
     private function buscarUsuarioEnChatwoot($account_id, $telefono)
     {
