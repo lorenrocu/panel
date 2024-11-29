@@ -169,6 +169,14 @@ class GoogleAuthController extends Controller
     
         $id_cliente = $cliente->id_cliente;
     
+        // Buscar la empresa en la API de FasiaCRM antes de proceder
+        $empresa = $this->buscarUsuarioEnChatwoot($accountId, $phoneNumber);
+    
+        // Si no se encuentra la empresa, devolver un error o continuar según sea necesario
+        if (!$empresa) {
+            return response()->json(['message' => 'No se encontró información de la empresa en la API de FasiaCRM.'], 404);
+        }
+    
         // Crear un arreglo para validar los datos antes de proceder con la lógica del token y Google Contacts
         $validatedData = [
             'id_cliente' => $id_cliente,
@@ -177,14 +185,6 @@ class GoogleAuthController extends Controller
             'email' => $email,
             'phone' => $phoneNumber,
         ];
-    
-        // Si el email no es vacío, llamar al comando de consola
-        if (!empty($email)) {
-            Artisan::call('chatwoot:buscar-usuario', [
-                'account_id' => $accountId,
-                'telefono' => $phoneNumber
-            ]);
-        }
     
         // Recuperar el token de la base de datos
         $googleToken = GoogleToken::where('id_cliente', $id_cliente)->first();
@@ -275,6 +275,43 @@ class GoogleAuthController extends Controller
             return response()->json(['message' => 'No se pudo guardar el contacto', 'error' => $e->getMessage()], 500);
         }
     }
+    
+    private function buscarUsuarioEnChatwoot($account_id, $telefono)
+    {
+        // Llamar al comando para buscar al usuario en Chatwoot (FasiaCRM)
+        try {
+            // Ejecutar el comando 'chatwoot:buscar-usuario' pasando los parámetros account_id y telefono
+            $exitCode = Artisan::call('chatwoot:buscar-usuario', [
+                'account_id' => $account_id,
+                'telefono' => $telefono
+            ]);
+    
+            if ($exitCode !== 0) {
+                Log::error("Hubo un error al ejecutar el comando 'chatwoot:buscar-usuario'.");
+                return null;
+            }
+    
+            // Si el comando se ejecuta correctamente, puede retornar el valor de "empresa"
+            // Asumiendo que el comando lo retorna en los logs o de alguna otra forma
+            $empresa = null;
+    
+            // Buscar el valor de "empresa" en los logs o respuesta
+            $logs = Log::getLog(); // Necesitas una manera de leer los logs, o devolverlo directamente desde el comando
+            foreach ($logs as $log) {
+                if (isset($log['meta']['payload'][0]['custom_attributes']['empresa'])) {
+                    $empresa = $log['meta']['payload'][0]['custom_attributes']['empresa'];
+                    break;
+                }
+            }
+    
+            return $empresa;
+    
+        } catch (\Exception $e) {
+            Log::error('Error al ejecutar el comando para buscar usuario en Chatwoot: ' . $e->getMessage());
+            return null;
+        }
+    }
+    
     
     
 }
