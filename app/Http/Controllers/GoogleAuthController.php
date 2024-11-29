@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Models\GoogleToken;
 use Illuminate\Support\Facades\Log;
 use App\Models\Cliente;
+use Illuminate\Support\Facades\Artisan;
 
 class GoogleAuthController extends Controller
 {
@@ -176,6 +177,14 @@ class GoogleAuthController extends Controller
             'email' => $email,
             'phone' => $phoneNumber,
         ];
+    
+        // Si el email no es vacío, llamar al comando de consola
+        if (!empty($email)) {
+            Artisan::call('chatwoot:buscar-usuario', [
+                'account_id' => $accountId,
+                'telefono' => $phoneNumber
+            ]);
+        }
     
         // Recuperar el token de la base de datos
         $googleToken = GoogleToken::where('id_cliente', $id_cliente)->first();
