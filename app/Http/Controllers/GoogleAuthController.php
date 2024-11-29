@@ -244,7 +244,7 @@ class GoogleAuthController extends Controller
         $newContact = new PeopleService\Person([
             'names' => [
                 [
-                    'givenName' => $request->first_name . ' - Prospecto',
+                    'givenName' => $validatedData['first_name'] . ' - Prospecto',
                     'familyName' => $validatedData['last_name'],
                 ],
             ],
