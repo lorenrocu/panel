@@ -44,4 +44,10 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    public function clientes()
+    {
+        return $this->belongsToMany(Cliente::class, 'cliente_user', 'user_id', 'cliente_id');
+    }
+
 }

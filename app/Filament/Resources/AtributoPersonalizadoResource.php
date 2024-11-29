@@ -11,9 +11,13 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Actions\Action;
+use App\Traits\HasSuperAdminAccess;
+use App\Traits\HasNavigationConfig;
 
 class AtributoPersonalizadoResource extends Resource
 {
+    use HasSuperAdminAccess, HasNavigationConfig;
+    
     protected static ?string $model = AtributoPersonalizado::class;
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 

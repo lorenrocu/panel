@@ -16,6 +16,8 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Forms\Components\TextInput;
 use Spatie\Permission\Models\Role;
 use Filament\Forms\Components\Select;
+use Illuminate\Support\Facades\Hash;
+
 
 class UserResource extends Resource
 {
@@ -62,6 +64,13 @@ class UserResource extends Resource
                     ->multiple(false) // Si quieres permitir solo un rol por usuario
                     ->relationship('roles', 'name') // Aquí 'roles' es la relación definida en tu modelo User
                     ->preload(),
+    
+                // Campo de selección de cliente
+                Select::make('clientes')
+                    ->label('Cliente')
+                    ->multiple(false) // Permitir seleccionar varios clientes si es necesario
+                    ->relationship('clientes', 'nombre_empresa') // Aquí 'clientes' es la relación definida en el modelo User
+                    ->preload(),
             ]);
     }
     
@@ -75,6 +84,8 @@ class UserResource extends Resource
                 TextColumn::make('email')->label('Email')->sortable()->searchable(),
                 // Añadimos la columna de rol
                 TextColumn::make('roles.name')->label('Rol')->sortable(),
+                // Añadimos la columna de cliente(s)
+                TextColumn::make('clientes.nombre_empresa')->label('Cliente(s)')->sortable(),
                 TextColumn::make('updated_at')->label('Actualizado')->dateTime()->sortable(),
             ])
             ->filters([
@@ -87,6 +98,7 @@ class UserResource extends Resource
                 Tables\Actions\DeleteBulkAction::make(),
             ]);
     }
+    
     
 
     public static function getRelations(): array

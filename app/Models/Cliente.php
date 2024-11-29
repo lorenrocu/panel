@@ -24,14 +24,20 @@ class Cliente extends Model
         return $this->belongsTo(Plan::class, 'id_plan');
     }
 
-        // Definir la relación con los atributos personalizados
-        public function atributosPersonalizados()
-        {
-            return $this->hasMany(AtributoPersonalizado::class, 'id_cliente', 'id_cliente');
-        }
+    // Definir la relación con los atributos personalizados
+    public function atributosPersonalizados()
+    {
+        return $this->hasMany(AtributoPersonalizado::class, 'id_cliente', 'id_cliente');
+    }
 
-        public function cliente()
-        {
-            return $this->belongsTo(Cliente::class, 'id_cliente');
-        }
+    public function cliente()
+    {
+        return $this->belongsTo(Cliente::class, 'id_cliente');
+    }
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'cliente_user', 'cliente_id', 'user_id');
+    }
+
 }
