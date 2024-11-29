@@ -250,10 +250,13 @@ class GoogleAuthController extends Controller
         $peopleService = new PeopleService($client);
     
         // Verificar si el email está presente para agregar la empresa al nombre
-        $givenName = $validatedData['first_name'] . ' - Prospecto'; // Nombre base
+        $givenName = $validatedData['first_name'];  // Solo el nombre base
         if ($email) {
-            // Si el email está presente, agregar la empresa
-            $givenName .= ' - ' . $empresa;
+            // Si el email está presente, agregar la empresa antes de Prospecto
+            $givenName .= ' - ' . $empresa . ' - Prospecto';
+        } else {
+            // Si no hay email, solo agregar Prospecto
+            $givenName .= ' - Prospecto';
         }
     
         // Crear el nuevo contacto con el nombre modificado (agregar la empresa solo si hay email)
