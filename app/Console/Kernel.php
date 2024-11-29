@@ -31,5 +31,6 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         // Register your command here
         EliminarAtributosChatwoot::class,
+        \App\Console\Commands\BuscarUsuarioChatwoot::class,
     ];
 }
