@@ -65,8 +65,24 @@ class BuscarUsuarioChatwoot extends Command
             // Si la respuesta es exitosa, la registramos en los logs
             if ($response->getStatusCode() == 200) {
                 $data = json_decode($response->getBody(), true);
+
+                // Extraer la empresa del payload (suponiendo que está en 'custom_attributes' dentro del 'payload')
+                $empresa = $data['payload'][0]['custom_attributes']['empresa'] ?? null;
+
+                // Registrar la respuesta completa y la empresa en los logs
                 Log::info('Respuesta de la API de FasiaCRM:', $data);
+                if ($empresa) {
+                    Log::info("Empresa encontrada: " . $empresa);
+                    $this->info("Empresa encontrada: $empresa");
+                } else {
+                    Log::warning("No se encontró la empresa en la respuesta.");
+                    $this->info("No se encontró la empresa en la respuesta.");
+                }
+
                 $this->info('La respuesta de la API ha sido registrada en los logs.');
+
+                // Puedes devolver la empresa aquí si es necesario
+                return $empresa;
             } else {
                 $this->error('Error al consultar la API de FasiaCRM. Código de estado: ' . $response->getStatusCode());
             }

@@ -278,30 +278,21 @@ class GoogleAuthController extends Controller
     
     private function buscarUsuarioEnChatwoot($account_id, $telefono)
     {
-        // Llamar al comando para buscar al usuario en Chatwoot (FasiaCRM)
         try {
-            // Ejecutar el comando 'chatwoot:buscar-usuario' pasando los parámetros account_id y telefono
-            $exitCode = Artisan::call('chatwoot:buscar-usuario', [
+            // Ejecutar el comando Artisan
+            $empresa = Artisan::call('chatwoot:buscar-usuario', [
                 'account_id' => $account_id,
                 'telefono' => $telefono
             ]);
     
-            if ($exitCode !== 0) {
-                Log::error("Hubo un error al ejecutar el comando 'chatwoot:buscar-usuario'.");
-                return null;
-            }
-    
-            // Si el comando se ejecuta correctamente, puede retornar el valor de "empresa"
-            // Asumiendo que el comando lo retorna en los logs o de alguna otra forma
+            // Ver si la salida contiene la empresa
+            $output = Artisan::output();
             $empresa = null;
     
-            // Buscar el valor de "empresa" en los logs o respuesta
-            $logs = Log::getLog(); // Necesitas una manera de leer los logs, o devolverlo directamente desde el comando
-            foreach ($logs as $log) {
-                if (isset($log['meta']['payload'][0]['custom_attributes']['empresa'])) {
-                    $empresa = $log['meta']['payload'][0]['custom_attributes']['empresa'];
-                    break;
-                }
+            // Buscar la empresa en la salida del comando
+            if (strpos($output, 'Empresa encontrada:') !== false) {
+                preg_match('/Empresa encontrada: (.*)/', $output, $matches);
+                $empresa = $matches[1] ?? null;
             }
     
             return $empresa;
@@ -311,7 +302,5 @@ class GoogleAuthController extends Controller
             return null;
         }
     }
-    
-    
     
 }
