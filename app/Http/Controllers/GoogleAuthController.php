@@ -155,7 +155,7 @@ class GoogleAuthController extends Controller
         $phoneNumber = $data['phone_number'] ?? null;
     
         // Verificar que los datos necesarios estén presentes
-        if (is_null($accountId) || is_null($firstName) || is_null($email) || is_null($phoneNumber)) {
+        if (is_null($accountId) || is_null($firstName) || is_null($phoneNumber)) {
             return response()->json(['message' => 'Datos insuficientes para procesar la solicitud.'], 400);
         }
     
