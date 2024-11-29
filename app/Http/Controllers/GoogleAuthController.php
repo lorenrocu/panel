@@ -172,9 +172,11 @@ class GoogleAuthController extends Controller
         // Buscar la empresa en la API de FasiaCRM antes de proceder
         $empresa = $this->buscarUsuarioEnChatwoot($accountId, $phoneNumber);
     
-        // Si no se encuentra la empresa, devolver un error o continuar según sea necesario
+        // Si no se encuentra la empresa, podemos devolver un error o continuar según sea necesario
+        // Pero siempre creamos el contacto, con o sin empresa
         if (!$empresa) {
-            return response()->json(['message' => 'No se encontró información de la empresa en la API de FasiaCRM.'], 404);
+            // En este caso, empresa será null y el nombre solo tendrá el formato base
+            $empresa = ''; // No agregar empresa si no la encontramos
         }
     
         // Crear un arreglo para validar los datos antes de proceder con la lógica del token y Google Contacts
@@ -283,6 +285,7 @@ class GoogleAuthController extends Controller
             return response()->json(['message' => 'No se pudo guardar el contacto', 'error' => $e->getMessage()], 500);
         }
     }
+    
     
     
     private function buscarUsuarioEnChatwoot($account_id, $telefono)
