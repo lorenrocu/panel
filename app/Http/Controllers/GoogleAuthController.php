@@ -199,7 +199,8 @@ class GoogleAuthController extends Controller
         $expiresIn = $googleToken->expires_at->timestamp - now()->timestamp;
     
         if ($expiresIn <= 0) {
-            // Refrescar el token si ha expirado
+            Log::info('El token ha expirado. Intentando refrescar el token para id_cliente: ' . $id_cliente);
+        
             $client = new Client();
             $client->setAuthConfig(storage_path('app/google/credentials.json'));
             $client->setAccessToken([
@@ -208,21 +209,25 @@ class GoogleAuthController extends Controller
                 'expires_in' => $expiresIn,
                 'created' => now()->timestamp,
             ]);
-    
+        
             if ($client->getRefreshToken()) {
                 $newToken = $client->fetchAccessTokenWithRefreshToken($client->getRefreshToken());
-    
+        
+                // Registrar en el log que el token fue refrescado
+                Log::info('Token refrescado exitosamente para id_cliente: ' . $id_cliente, [
+                    'new_access_token' => $newToken['access_token'],
+                    'expires_in' => $newToken['expires_in'],
+                ]);
+        
                 // Actualizar el token en la base de datos
                 $googleToken->access_token = $newToken['access_token'];
                 $googleToken->expires_at = now()->addSeconds($newToken['expires_in']);
                 $googleToken->save();
-    
-                // Recalcular expiresIn con el nuevo expires_at
-                $expiresIn = $googleToken->expires_at->timestamp - now()->timestamp;
             } else {
+                Log::error('No se pudo refrescar el token. El refresh token no está disponible para id_cliente: ' . $id_cliente);
                 return response()->json(['message' => 'El token de refresco no está disponible o ha expirado. Por favor, reautentique.'], 401);
             }
-        }
+        }        
     
         // Configurar el servicio de Google Client
         $client = new Client();
@@ -238,15 +243,22 @@ class GoogleAuthController extends Controller
         if ($client->isAccessTokenExpired()) {
             if ($client->getRefreshToken()) {
                 $newToken = $client->fetchAccessTokenWithRefreshToken($client->getRefreshToken());
-    
+        
+                // Registrar en el log que se está refrescando el token
+                Log::info('El token ha expirado. Refrescando el token para id_cliente: ' . $id_cliente, [
+                    'new_access_token' => $newToken['access_token'],
+                    'expires_in' => $newToken['expires_in'],
+                ]);
+        
                 // Actualizar el token en la base de datos
                 $googleToken->access_token = $newToken['access_token'];
                 $googleToken->expires_at = now()->addSeconds($newToken['expires_in']);
                 $googleToken->save();
             } else {
-                return response()->json(['message' => 'El token de refresco no está disponible o ha expirado. Por favor, reautentique.'], 401);
+                Log::warning('El refresh token no está disponible o ha expirado para id_cliente: ' . $id_cliente);
+                throw new \Exception('Refresh token not available or expired. Please re-authenticate.');
             }
-        }
+        }        
     
         // Configurar el servicio de People API
         $peopleService = new PeopleService($client);
