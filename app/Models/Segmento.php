@@ -37,4 +37,9 @@ class Segmento extends Model
             }
         });
     }
+
+    public function contactos()
+    {
+        return $this->belongsToMany(Contacto::class, 'contacto_segmento', 'segmento_id', 'contacto_id');
+    }
 }
