@@ -10,7 +10,7 @@ class Segmento extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['nombre', 'tipo_de_segmento', 'cliente_id'];
+    protected $fillable = ['nombre', 'tipo_de_segmento', 'cliente_id', 'archivo_csv'];
 
     // Relación con Cliente
     public function cliente()

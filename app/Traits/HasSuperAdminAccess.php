@@ -37,6 +37,14 @@ trait HasSuperAdminAccess
                 'client' => ['view', 'create', 'edit', 'delete'],
             ],
         ],
+        'App\Filament\Resources\ProgramacionResource' => [
+            'roles' => ['admin', 'staff', 'client'],
+            'actions' => [
+                'admin' => ['view', 'create', 'edit', 'delete'],
+                'staff' => ['view', 'create', 'edit', 'delete'],
+                'client' => ['view', 'create', 'edit', 'delete'],
+            ],
+        ],
     ];
 
     // Controla si un recurso debe estar registrado en la navegación (mostrar en el menú)

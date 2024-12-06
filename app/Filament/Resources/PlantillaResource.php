@@ -22,7 +22,7 @@ class PlantillaResource extends Resource
 
     protected static ?string $model = Plantilla::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-command-line';
 
     public static function form(Form $form): Form
     {

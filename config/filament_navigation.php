@@ -36,6 +36,7 @@ return [
                 'App\Filament\Resources\PlantillaResource',
                 'App\Filament\Resources\SegmentoResource',
                 'App\Filament\Resources\ContactoResource',
+                'App\Filament\Resources\ProgramacionResource',
             ],
             'icon' => 'heroicon-o-cube-transparent',
             'order' => 4,

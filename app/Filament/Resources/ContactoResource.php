@@ -26,7 +26,9 @@ class ContactoResource extends Resource
 
     protected static ?string $model = Contacto::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-user-plus';
+
+    protected static ?string $navigationLabel = 'Contactos';
 
     public static function form(Form $form): Form
     {
