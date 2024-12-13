@@ -245,14 +245,22 @@ class GoogleAuthController extends Controller
         if ($client->isAccessTokenExpired()) {
             if ($client->getRefreshToken()) {
                 $newToken = $client->fetchAccessTokenWithRefreshToken($client->getRefreshToken());
-        
-                // Registrar en el log que se está refrescando el token
-                Log::info('El token ha expirado. Refrescando el token para id_cliente: ' . $id_cliente, [
-                    'new_access_token' => $newToken['access_token'],
-                    'expires_in' => $newToken['expires_in'],
-                ]);
-        
-                // Actualizar el token en la base de datos
+
+                Log::info('Respuesta al refrescar token:', $newToken);
+                
+                if (isset($newToken['error'])) {
+                    // Manejar el error apropiadamente, por ejemplo:
+                    Log::error('Error al refrescar el token: ' . $newToken['error']);
+                    return response()->json(['message' => 'No se pudo refrescar el token. Por favor, reautentica.'], 401);
+                }
+                
+                if (!isset($newToken['access_token'])) {
+                    // No se devolvió un access_token válido
+                    Log::error('No se recibió un access_token al refrescar el token.');
+                    return response()->json(['message' => 'No se recibió un nuevo access_token. Por favor, reautentica.'], 401);
+                }
+                
+                // Si llegaste aquí, ya tienes access_token
                 $googleToken->access_token = $newToken['access_token'];
                 $googleToken->expires_at = now()->addSeconds($newToken['expires_in']);
                 $googleToken->save();
