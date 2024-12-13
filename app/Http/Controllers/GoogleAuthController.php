@@ -14,44 +14,62 @@ class GoogleAuthController extends Controller
 {
     public function authenticate(Request $request)
     {
+        Log::info('Iniciando autenticación con Google', [
+            'query_params' => $request->query(),
+        ]);
+
         $client = new Client();
         $client->setAuthConfig(storage_path('app/google/credentials.json'));
         $client->addScope(PeopleService::CONTACTS);
         $client->setRedirectUri(route('google.callback'));
         $client->setAccessType('offline');
     
-        // Obtener el id_cliente del parámetro de consulta
         $id_cliente = $request->query('id_cliente');
-    
-        // Establecer el parámetro state con el id_cliente
+        Log::info('id_cliente obtenido del request', ['id_cliente' => $id_cliente]);
+
         $client->setState($id_cliente);
     
         $authUrl = $client->createAuthUrl();
+        Log::info('URL de autenticación generada', ['auth_url' => $authUrl]);
+
         return redirect($authUrl);
     }
 
     public function callback(Request $request)
     {
-        $client = new \Google\Client();
+        Log::info('Callback recibido de Google', [
+            'query_params' => $request->query(),
+        ]);
+
+        $client = new Client();
         $client->setAuthConfig(storage_path('app/google/credentials.json'));
     
-        $tokenData = $client->fetchAccessTokenWithAuthCode($request->code);
+        $code = $request->input('code');
+        Log::info('Intercambiando code por token', ['code' => $code]);
 
+        $tokenData = $client->fetchAccessTokenWithAuthCode($code);
         Log::info('Datos del token retornados por Google:', $tokenData);
     
         if (isset($tokenData['error'])) {
+            Log::error('Error al obtener token de Google', ['error' => $tokenData['error']]);
             return response()->json(['error' => $tokenData['error']], 400);
         }
     
-        // Recuperar el id_cliente del parámetro state
         $id_cliente = $request->input('state');
-    
-        // Verificar que id_cliente no sea nulo
+        Log::info('id_cliente obtenido del estado', ['id_cliente' => $id_cliente]);
+
         if (!$id_cliente) {
+            Log::error('No se recibió id_cliente en el state');
             return response()->json(['error' => 'Client ID not found in state parameter'], 400);
         }
     
-        // Guarda los tokens en la base de datos usando id_cliente
+        Log::info('Guardando tokens en la base de datos', [
+            'id_cliente' => $id_cliente,
+            'access_token' => $tokenData['access_token'],
+            'refresh_token' => $tokenData['refresh_token'] ?? null,
+            'expires_in' => $tokenData['expires_in']
+        ]);
+
         GoogleToken::updateOrCreate(
             ['id_cliente' => $id_cliente],
             [
@@ -61,17 +79,27 @@ class GoogleAuthController extends Controller
             ]
         );
     
+        Log::info('Token guardado exitosamente', ['id_cliente' => $id_cliente]);
+
         return response()->json(['message' => 'Authenticated successfully']);
     }
 
     private function getClientForCustomer($id_cliente)
     {
-        // Recuperar el token de la base de datos
+        Log::info('Obteniendo cliente de Google para el id_cliente', ['id_cliente' => $id_cliente]);
+
         $googleToken = GoogleToken::where('id_cliente', $id_cliente)->first();
 
         if (!$googleToken) {
+            Log::error('No se encontró token en la base de datos para este id_cliente', ['id_cliente' => $id_cliente]);
             throw new \Exception('No token found for this client');
         }
+
+        Log::info('Token encontrado', [
+            'access_token' => $googleToken->access_token,
+            'refresh_token' => $googleToken->refresh_token,
+            'expires_at' => $googleToken->expires_at
+        ]);
 
         $client = new Client();
         $client->setAuthConfig(storage_path('app/google/credentials.json'));
@@ -83,31 +111,46 @@ class GoogleAuthController extends Controller
         ]);
 
         if ($client->isAccessTokenExpired()) {
+            Log::info('El token ha expirado, intentando refrescar', ['id_cliente' => $id_cliente]);
             if ($client->getRefreshToken()) {
                 $newToken = $client->fetchAccessTokenWithRefreshToken($client->getRefreshToken());
+                Log::info('Respuesta al refrescar token (getClientForCustomer):', $newToken);
 
-                // Actualizar el token en la base de datos
+                if (isset($newToken['error'])) {
+                    Log::error('Error al refrescar el token (getClientForCustomer)', ['error' => $newToken['error']]);
+                    throw new \Exception('Error refreshing token: ' . $newToken['error']);
+                }
+
+                if (!isset($newToken['access_token'])) {
+                    Log::error('No se recibió access_token al refrescar el token (getClientForCustomer)');
+                    throw new \Exception('No access_token received during refresh.');
+                }
+
                 $googleToken->access_token = $newToken['access_token'];
                 $googleToken->expires_at = now()->addSeconds($newToken['expires_in']);
                 $googleToken->save();
+                Log::info('Token refrescado y guardado exitosamente (getClientForCustomer)', ['id_cliente' => $id_cliente]);
             } else {
+                Log::error('No hay refresh token disponible (getClientForCustomer)', ['id_cliente' => $id_cliente]);
                 throw new \Exception('Refresh token not available or expired. Please re-authenticate.');
             }
         }
 
         return $client;
-    }    
+    }
 
     public function storeContact(Request $request)
     {
+        Log::info('storeContact: Datos recibidos', $request->all());
+
         try {
-            // Usar la función getClientForCustomer para obtener el cliente de Google
-            $client = $this->getClientForCustomer($request->get('id_cliente'));
-    
-            // Crear el servicio de People API usando el cliente válido
+            $id_cliente = $request->get('id_cliente');
+            Log::info('Obteniendo cliente de Google para storeContact', ['id_cliente' => $id_cliente]);
+            $client = $this->getClientForCustomer($id_cliente);
+
+            Log::info('Creando servicio PeopleService en storeContact');
             $peopleService = new PeopleService($client);
-    
-            // Crear el contacto utilizando los datos recibidos del Request
+
             $newContact = new PeopleService\Person([
                 'names' => [
                     [
@@ -126,82 +169,89 @@ class GoogleAuthController extends Controller
                     ]
                 ]
             ]);
-    
-            // Crear el contacto usando el servicio de Google
+
+            Log::info('Intentando crear contacto en Google Contacts', ['contact_data' => $newContact]);
             $result = $peopleService->people->createContact($newContact);
-    
-            // Retornar la respuesta en caso de éxito
+
+            Log::info('Contacto creado exitosamente en storeContact', ['result' => $result]);
+
             return response()->json($result, 201);
         } catch (\Exception $e) {
-            // Capturar cualquier error y devolver un mensaje con el código de error 500
+            Log::error('Error en storeContact', ['error' => $e->getMessage()]);
             return response()->json(['message' => $e->getMessage()], 500);
         }
     }
-    
 
     public function saveContact(Request $request)
     {
-        // Registrar el JSON entrante en los logs
         Log::info('Paso 2: Datos recibidos en saveContact:', $request->all());
     
-        // Decodificar manualmente el contenido del JSON recibido
         $data = json_decode($request->getContent(), true);
-    
+
+        Log::info('JSON decodificado en saveContact:', ['data' => $data]);
+
         if (json_last_error() !== JSON_ERROR_NONE) {
+            Log::error('JSON inválido recibido en saveContact', ['error_msg' => json_last_error_msg()]);
             return response()->json(['message' => 'JSON inválido recibido', 'error' => json_last_error_msg()], 400);
         }
     
-        // Extraer los valores necesarios del JSON recibido
         $accountId = $data['account']['id'] ?? null;
         $firstName = $data['name'] ?? null;
         $email = $data['email'] ?? null;
         $phoneNumber = $data['phone_number'] ?? null;
+
+        Log::info('Datos extraídos del JSON en saveContact', [
+            'accountId' => $accountId,
+            'firstName' => $firstName,
+            'email' => $email,
+            'phoneNumber' => $phoneNumber
+        ]);
     
-        // Verificar que los datos necesarios estén presentes
         if (is_null($accountId) || is_null($firstName) || is_null($phoneNumber)) {
+            Log::error('Datos insuficientes en saveContact');
             return response()->json(['message' => 'Datos insuficientes para procesar la solicitud.'], 400);
         }
     
-        // Buscar el id_cliente en la base de datos usando el account_id proporcionado
         $cliente = Cliente::where('id_account', $accountId)->first();
-    
+
         if (!$cliente) {
+            Log::error('Cliente no encontrado para account_id proporcionado', ['accountId' => $accountId]);
             return response()->json(['message' => 'Cliente no encontrado para el account_id proporcionado.'], 404);
         }
-    
+
         $id_cliente = $cliente->id_cliente;
+        Log::info('Cliente encontrado para saveContact', ['id_cliente' => $id_cliente]);
     
-        // Buscar la empresa en la API de FasiaCRM antes de proceder
         $empresa = $this->buscarUsuarioEnChatwoot($accountId, $phoneNumber);
-    
-        // Si no se encuentra la empresa, podemos devolver un error o continuar según sea necesario
-        // Pero siempre creamos el contacto, con o sin empresa
+        Log::info('Empresa encontrada en Chatwoot', ['empresa' => $empresa]);
+
         if (!$empresa) {
-            // En este caso, empresa será null y el nombre solo tendrá el formato base
-            $empresa = ''; // No agregar empresa si no la encontramos
+            Log::info('No se encontró empresa, se usará cadena vacía');
+            $empresa = '';
         }
     
-        // Crear un arreglo para validar los datos antes de proceder con la lógica del token y Google Contacts
         $validatedData = [
             'id_cliente' => $id_cliente,
             'first_name' => $firstName,
-            'last_name' => '', // Dejar last_name vacío ya que no lo estamos recibiendo
+            'last_name' => '',
             'email' => $email,
             'phone' => $phoneNumber,
         ];
+
+        Log::info('Datos validados para guardar contacto en Google', $validatedData);
     
-        // Recuperar el token de la base de datos
         $googleToken = GoogleToken::where('id_cliente', $id_cliente)->first();
     
         if (!$googleToken) {
+            Log::error('No se encontró token para este cliente', ['id_cliente' => $id_cliente]);
             return response()->json(['message' => 'No se encontró un token para este cliente.'], 404);
         }
-    
-        // Verificar si el token ha expirado
+
         $expiresIn = $googleToken->expires_at->timestamp - now()->timestamp;
+        Log::info('Tiempo restante antes de expiración del token', ['expires_in' => $expiresIn]);
     
         if ($expiresIn <= 0) {
-            Log::info('El token ha expirado. Intentando refrescar el token para id_cliente: ' . $id_cliente);
+            Log::info('El token ha expirado. Intentando refrescar el token', ['id_cliente' => $id_cliente]);
         
             $client = new Client();
             $client->setAuthConfig(storage_path('app/google/credentials.json'));
@@ -214,24 +264,33 @@ class GoogleAuthController extends Controller
         
             if ($client->getRefreshToken()) {
                 $newToken = $client->fetchAccessTokenWithRefreshToken($client->getRefreshToken());
+
+                Log::info('Respuesta al refrescar token (primer intento en saveContact):', $newToken);
         
-                // Registrar en el log que el token fue refrescado
-                Log::info('Token refrescado exitosamente para id_cliente: ' . $id_cliente, [
+                if (isset($newToken['error'])) {
+                    Log::error('Error al refrescar el token (primer intento saveContact)', ['error' => $newToken['error']]);
+                    return response()->json(['message' => 'No se pudo refrescar el token. Por favor, reautentica.'], 401);
+                }
+        
+                if (!isset($newToken['access_token'])) {
+                    Log::error('No se recibió un access_token al refrescar el token (primer intento saveContact)');
+                    return response()->json(['message' => 'No se recibió un nuevo access_token. Por favor, reautentica.'], 401);
+                }
+
+                Log::info('Token refrescado exitosamente (primer intento saveContact)', [
                     'new_access_token' => $newToken['access_token'],
                     'expires_in' => $newToken['expires_in'],
                 ]);
         
-                // Actualizar el token en la base de datos
                 $googleToken->access_token = $newToken['access_token'];
                 $googleToken->expires_at = now()->addSeconds($newToken['expires_in']);
                 $googleToken->save();
             } else {
-                Log::error('No se pudo refrescar el token. El refresh token no está disponible para id_cliente: ' . $id_cliente);
+                Log::error('No se pudo refrescar el token. El refresh token no está disponible (primer intento saveContact)', ['id_cliente' => $id_cliente]);
                 return response()->json(['message' => 'El token de refresco no está disponible o ha expirado. Por favor, reautentique.'], 401);
             }
         }        
     
-        // Configurar el servicio de Google Client
         $client = new Client();
         $client->setAuthConfig(storage_path('app/google/credentials.json'));
         $client->setAccessToken([
@@ -240,101 +299,105 @@ class GoogleAuthController extends Controller
             'expires_in' => $expiresIn,
             'created' => now()->timestamp,
         ]);
-    
-        // Verificar si el token ha expirado y refrescarlo si es necesario
+
+        Log::info('Cliente Google configurado antes de isAccessTokenExpired en saveContact');
+
         if ($client->isAccessTokenExpired()) {
+            Log::info('El token parece expirado nuevamente. Intentando segundo refresco', ['id_cliente' => $id_cliente]);
+
             if ($client->getRefreshToken()) {
                 $newToken = $client->fetchAccessTokenWithRefreshToken($client->getRefreshToken());
 
-                Log::info('Respuesta al refrescar token:', $newToken);
+                Log::info('Respuesta al refrescar token (segundo intento en saveContact):', $newToken);
                 
                 if (isset($newToken['error'])) {
-                    // Manejar el error apropiadamente, por ejemplo:
-                    Log::error('Error al refrescar el token: ' . $newToken['error']);
+                    Log::error('Error al refrescar el token (segundo intento saveContact)', ['error' => $newToken['error']]);
                     return response()->json(['message' => 'No se pudo refrescar el token. Por favor, reautentica.'], 401);
                 }
                 
                 if (!isset($newToken['access_token'])) {
-                    // No se devolvió un access_token válido
-                    Log::error('No se recibió un access_token al refrescar el token.');
+                    Log::error('No se recibió un access_token al refrescar el token (segundo intento saveContact)');
                     return response()->json(['message' => 'No se recibió un nuevo access_token. Por favor, reautentica.'], 401);
                 }
-                
-                // Si llegaste aquí, ya tienes access_token
+
+                Log::info('Token refrescado exitosamente (segundo intento saveContact)', [
+                    'new_access_token' => $newToken['access_token'],
+                    'expires_in' => $newToken['expires_in'],
+                ]);
+
                 $googleToken->access_token = $newToken['access_token'];
                 $googleToken->expires_at = now()->addSeconds($newToken['expires_in']);
                 $googleToken->save();
             } else {
-                Log::warning('El refresh token no está disponible o ha expirado para id_cliente: ' . $id_cliente);
+                Log::warning('El refresh token no está disponible o ha expirado (segundo intento saveContact)', ['id_cliente' => $id_cliente]);
                 throw new \Exception('Refresh token not available or expired. Please re-authenticate.');
             }
         }        
     
-        // Configurar el servicio de People API
+        Log::info('Creando servicio PeopleService en saveContact');
         $peopleService = new PeopleService($client);
     
-        // Verificar si el email está presente para agregar la empresa al nombre
-        $givenName = $validatedData['first_name'];  // Solo el nombre base
+        $givenName = $validatedData['first_name'];
         if ($email) {
-            // Si el email está presente, agregar la empresa antes de Prospecto
             $givenName .= ' - ' . $empresa . ' - Prospecto';
         } else {
-            // Si no hay email, solo agregar Prospecto
             $givenName .= ' - Prospecto';
         }
-    
-        // Crear el nuevo contacto con el nombre modificado (agregar la empresa solo si hay email)
-        $newContact = new PeopleService\Person([
+
+        $newContactData = [
             'names' => [
                 [
-                    'givenName' => $givenName,  // Nombre ajustado según la condición
+                    'givenName' => $givenName,
                     'familyName' => $validatedData['last_name'],
                 ],
             ],
-            'emailAddresses' => $email ? [['value' => $validatedData['email']]] : [], // Solo agregar el email si está presente
+            'emailAddresses' => $email ? [['value' => $validatedData['email']]] : [],
             'phoneNumbers' => [
                 ['value' => $validatedData['phone']],
             ],
-        ]);
+        ];
+
+        Log::info('Datos del nuevo contacto a crear en Google Contacts', $newContactData);
     
         try {
-            // Guardar el contacto en Google Contacts
+            $newContact = new PeopleService\Person($newContactData);
             $result = $peopleService->people->createContact($newContact);
+
+            Log::info('Contacto guardado exitosamente en Google Contacts', ['result' => $result]);
     
             return response()->json(['message' => 'Contacto guardado exitosamente', 'contact' => $result], 201);
         } catch (\Exception $e) {
-            // Manejar errores de la API de Google
+            Log::error('Error al guardar el contacto en Google Contacts', ['error' => $e->getMessage()]);
             return response()->json(['message' => 'No se pudo guardar el contacto', 'error' => $e->getMessage()], 500);
         }
     }
     
-    
-    
     private function buscarUsuarioEnChatwoot($account_id, $telefono)
     {
+        Log::info('Buscando usuario en Chatwoot', ['account_id' => $account_id, 'telefono' => $telefono]);
         try {
-            // Ejecutar el comando Artisan
             $empresa = Artisan::call('chatwoot:buscar-usuario', [
                 'account_id' => $account_id,
                 'telefono' => $telefono
             ]);
     
-            // Ver si la salida contiene la empresa
             $output = Artisan::output();
+            Log::info('Salida del comando chatwoot:buscar-usuario', ['output' => $output]);
+
             $empresa = null;
     
-            // Buscar la empresa en la salida del comando
             if (strpos($output, 'Empresa encontrada:') !== false) {
                 preg_match('/Empresa encontrada: (.*)/', $output, $matches);
                 $empresa = $matches[1] ?? null;
             }
     
+            Log::info('Empresa obtenida de Chatwoot', ['empresa' => $empresa]);
+
             return $empresa;
     
         } catch (\Exception $e) {
-            Log::error('Error al ejecutar el comando para buscar usuario en Chatwoot: ' . $e->getMessage());
+            Log::error('Error al ejecutar el comando para buscar usuario en Chatwoot', ['error' => $e->getMessage()]);
             return null;
         }
     }
-    
 }
