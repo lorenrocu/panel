@@ -17,6 +17,7 @@ class Kernel extends ConsoleKernel
         // $schedule->command('inspire')->hourly();
         $schedule->command('tabla:vaciar-ingresos')->dailyAt('00:00');
         $schedule->command('programaciones:ejecutar')->everyMinute();
+        $schedule->command('chatwoot:update-config')->cron('0 */3 * * *');
     }
 
     /**
