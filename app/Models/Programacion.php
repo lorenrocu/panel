@@ -21,6 +21,12 @@ class Programacion extends Model
         'id_cliente', // Asegúrate de agregar este campo en el fillable
     ];
 
+    public function segmento()
+    {
+        return $this->belongsTo(Segmento::class, 'segmento_id', 'id');
+    }
+
+
     public function getEstadoTextAttribute()
     {
         return $this->estado == 0 ? 'Pendiente' : 'Procesado';

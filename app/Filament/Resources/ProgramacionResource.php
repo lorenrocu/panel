@@ -65,7 +65,7 @@ class ProgramacionResource extends Resource
                 })
                 ->visible(fn (callable $get) => $get('tipo') === 'Segmento') 
                 ->searchable()
-                ->required(),  
+                ->nullable(), 
             
             DateTimePicker::make('fecha_programada')
                 ->label('Fecha y Hora de Programación')
