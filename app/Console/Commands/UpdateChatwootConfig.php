@@ -77,7 +77,7 @@ class UpdateChatwootConfig extends Command
                 $this->info('Actualización adicional realizada en la tabla installation_configs de la base de datos de Chatwoot');
 
                 // Enviar notificación de éxito
-                $this->sendNotification('La tabla fue actualizada y el script Puppeteer fue ejecutado con éxito');
+                //$this->sendNotification('La tabla fue actualizada y el script Puppeteer fue ejecutado con éxito');
             }
         } catch (\Exception $e) {
             // En caso de error, revertir la transacción
