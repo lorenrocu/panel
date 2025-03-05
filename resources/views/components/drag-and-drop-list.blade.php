@@ -68,9 +68,31 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Reordenar la lista con SortableJS
-    new Sortable(listElement, {
-        animation: 150
-    });
+new Sortable(listElement, {
+    animation: 150,
+    onEnd: function (evt) {
+        // Construir el nuevo array de valores tras reordenar
+        const newValuesArray = Array.from(listElement.querySelectorAll('li')).map(li => li.innerText);
+        console.log('Nuevo orden (onEnd):', newValuesArray);
+
+        // Enviar el nuevo orden automáticamente al backend
+        if (id) {
+            @this.call('saveNewArrayOrder', {
+                id: id,
+                new_values: newValuesArray
+            }).then(response => {
+                if (response.success) {
+                    console.log('Datos guardados con éxito:', response.new_values);
+                } else {
+                    console.error('Error al guardar:', response.message);
+                }
+            });
+        } else {
+            console.error('No se pudo enviar el ID porque está vacío');
+        }
+    }
+});
+
 
     // Guardar valores cuando el usuario haga clic en el enlace "Guardar Valores"
     saveItemsLink.addEventListener('click', function (e) {
