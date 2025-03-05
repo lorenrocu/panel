@@ -91,20 +91,27 @@ class UpdateChatwootConfig extends Command
     {
         try {
             $client = new Client();
-            $response = $client->post('https://api-v2.molinodigital.com/message/sendText/Molino Digital', [
+            // Obtener los parámetros desde el archivo .env
+            $apiUrl = env('EVO_API_URL');
+            $apiKey = env('EVO_API_KEY');
+            // Concatenar el endpoint deseado
+            $endpoint = $apiUrl . '/message/sendText/Molino Digital';
+    
+            $response = $client->post($endpoint, [
                 'headers' => [
                     'Content-Type' => 'application/json',
-                    'apikey' => 'FB194960-8134-4EF9-A93A-244F3A656739'
+                    'apikey' => $apiKey
                 ],
                 'json' => [
                     'number' => '51938649457',
                     'text' => $message
                 ]
             ]);
-
+    
             $this->info('Notificación enviada: ' . $response->getBody()->getContents());
         } catch (RequestException $e) {
             $this->error('Error enviando la notificación: ' . $e->getMessage());
         }
     }
+    
 }
