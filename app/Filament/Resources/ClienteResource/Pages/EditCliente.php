@@ -38,11 +38,11 @@ class EditCliente extends EditRecord
 
     protected $listeners = ['refreshComponent'];
 
-public function refreshComponent()
-{
-    $this->emit('refresh');
-    $this->record->refresh();
-}
+    public function refreshComponent()
+    {
+        $this->record->refresh();
+    }
+    
 
 
     public function mount($record): void
@@ -300,7 +300,7 @@ public function refreshComponent()
             if ($updated) {
                 Log::info('Actualización exitosa en la base de datos para el ID:', ['id' => $id]);
                 // Emitir un evento Livewire para refrescar la vista del componente
-                $this->emit('refreshComponent');
+                $this->refreshComponent();
     
                 // Retornar una respuesta de éxito
                 return [
