@@ -61,8 +61,9 @@ class UpdateChatwootConfig extends Command
             DB::connection('pgsql_chatwoot')->commit();
             $this->info('Actualización realizada en la tabla installation_configs de la base de datos de Chatwoot');
 
-            // Llamar a la API de Puppeteer con el mismo endpoint que en Node
-            $response = $client->get('http://135.181.87.23:3007/run-script');
+            // Llamar a la API de Puppeteer usando la URL desde las variables de entorno
+            $puppeteerUrl = env('API_PUPPETER');
+            $response = $client->get($puppeteerUrl . '/api/run-script');
             $body = trim((string)$response->getBody());
             $this->info('Respuesta de la API Puppeteer: ' . $body);
 
