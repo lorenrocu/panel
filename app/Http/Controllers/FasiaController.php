@@ -81,7 +81,7 @@ class FasiaController extends Controller
                     \Log::info('Datos de la campaña UTM encontrados.', (array) $utmData);
 
                     // Obtener el token para id_account
-                    $token = DB::table('cliente')
+                    $token = DB::table('clientes')
                                ->where('id_account', $accountId)
                                ->value('token');
 
