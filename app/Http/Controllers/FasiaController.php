@@ -71,10 +71,10 @@ class FasiaController extends Controller
                 // Si no es un número, manejar la lógica para Facebook UTMs
                 \Log::info('El valor dentro de los corchetes no es un número.');
 
-                // Consulta a la base de datos campanas_utm_facebook
-                $utmData = DB::table('campanas_utm_facebook')
+                // Consulta a la base de datos campanas_facebook
+                $utmData = DB::table('campanas_facebook')
                             ->where('id_account', $accountId)
-                            ->where('id', $capturedValue)
+                            ->where('id_campana', $capturedValue)
                             ->first();
 
                 if ($utmData) {
