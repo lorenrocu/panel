@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('campanas_facebook', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('id_cliente');  // Ajusta esto según sea necesario
-            $table->string('nombre_campana');          // Otro ejemplo de columna
             $table->timestamps();
         });
     }
