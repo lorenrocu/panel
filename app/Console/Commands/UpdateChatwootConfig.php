@@ -83,7 +83,7 @@ class UpdateChatwootConfig extends Command
             // En caso de error, revertir la transacción
             DB::connection('pgsql_chatwoot')->rollBack();
             $this->error('Error realizando la actualización: ' . $e->getMessage());
-            $this->sendNotification('Hubo error al momento de actualizar la tabla');
+            //$this->sendNotification('Hubo error al momento de actualizar la tabla');
         }
     }
 
