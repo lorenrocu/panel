@@ -21,6 +21,11 @@ use App\Traits\HasNavigationConfig;
 
 class ProgramacionResource extends Resource
 {
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole('admin');
+    }
+    
     use HasClientFilter, HasSuperAdminAccess, HasNavigationConfig;
 
     protected static ?string $model = Programacion::class;

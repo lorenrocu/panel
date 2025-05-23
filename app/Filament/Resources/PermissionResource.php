@@ -18,6 +18,11 @@ use Spatie\Permission\Models\Permission;
 
 class PermissionResource extends Resource
 {
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole('admin');
+    }
+    
     protected static ?string $model = Permission::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-key';

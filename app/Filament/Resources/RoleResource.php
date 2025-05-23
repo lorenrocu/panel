@@ -19,6 +19,10 @@ use Filament\Forms\Components\Select;
 
 class RoleResource extends Resource
 {
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole('admin');
+    }
     protected static ?string $model = Role::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-shield-check';

@@ -18,6 +18,11 @@ use App\Traits\HasNavigationConfig;
 
 class PlantillaResource extends Resource
 {
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole('admin');
+    }
+
     use HasSuperAdminAccess, HasNavigationConfig;
 
     protected static ?string $model = Plantilla::class;

@@ -37,7 +37,7 @@ return new class extends Migration
                 $table->dropColumn('nombre_campana');
             }
 
-            //$table->unique(['id_cliente', 'id_campana']);
+            // $table->unique(['id_cliente', 'id_campana']); // Comentado para permitir duplicados según nuevo requisito
         });
     }
 
@@ -47,7 +47,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('campanas_facebook', function (Blueprint $table) {
-            $table->dropUnique(['id_cliente', 'id_campana']);
+            // $table->dropUnique(['id_cliente', 'id_campana']); // Comentado porque la restricción unique se elimina
             $table->dropColumn([
                 'id_account',
                 'id_campana',

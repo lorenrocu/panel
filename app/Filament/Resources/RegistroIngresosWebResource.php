@@ -20,6 +20,12 @@ use Filament\Forms\Components\TimePicker;
 
 class RegistroIngresosWebResource extends Resource
 {
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole('admin') || auth()->user()->hasRole('staff');
+    }
+
     protected static ?string $model = RegistroIngresosWeb::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';

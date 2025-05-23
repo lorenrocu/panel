@@ -13,6 +13,7 @@ class Cliente extends Model
     protected $fillable = [
         'nombre_empresa',
         'id_plan',
+        'empresa_principal_id',
         'token',
         'id_account',
         'email',
@@ -30,9 +31,14 @@ class Cliente extends Model
         return $this->hasMany(AtributoPersonalizado::class, 'id_cliente', 'id_cliente');
     }
 
-    public function cliente()
+    public function empresaPrincipal()
     {
-        return $this->belongsTo(Cliente::class, 'id_cliente');
+        return $this->belongsTo(Cliente::class, 'empresa_principal_id');
+    }
+
+    public function clientesAsociados()
+    {
+        return $this->hasMany(Cliente::class, 'empresa_principal_id');
     }
 
     public function users()

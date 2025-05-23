@@ -21,7 +21,7 @@ class CampanaFacebookResource extends Resource
 {
     public static function canViewAny(): bool
     {
-        return auth()->user()->hasRole('admin') || auth()->user()->hasRole('staff');
+        return auth()->user()->hasRole('admin') || auth()->user()->hasRole('staff') || auth()->user()->hasRole('client');
     }
 
     public static function getLabel(): string
@@ -43,12 +43,25 @@ class CampanaFacebookResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-megaphone';
 
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+        $user = auth()->user();
+
+        if ($user->hasRole('client')) {
+            $clienteIds = $user->clientes()->pluck('clientes.id_cliente')->toArray();
+            $query->whereIn('id_cliente', $clienteIds);
+        }
+
+        return $query;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
                 Select::make('id_cliente')
-                ->label('Cliente')
+                ->label('Empresa')
                 ->options(Cliente::all()->pluck('nombre_empresa', 'id_cliente'))  // Cambia 'id' por 'id_cliente'
                 ->required()
                 ->reactive()

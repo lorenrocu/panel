@@ -17,6 +17,11 @@ use Illuminate\Support\Facades\Log;
 
 class SegmentoResource extends Resource
 {
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole('admin');
+    }
+
     use HasSuperAdminAccess, HasNavigationConfig;
 
     protected static ?string $model = Segmento::class;

@@ -21,6 +21,12 @@ use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
 {
+    
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole('admin');
+    }
+
     protected static ?string $model = User::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-users';

@@ -37,6 +37,12 @@ class ClienteResource extends Resource
                     ->label('Plan')
                     ->relationship('plan', 'nombre')  // Asocia con la tabla planes
                     ->required(),
+                Select::make('empresa_principal_id')
+                    ->label('Empresa Principal')
+                    ->relationship('empresaPrincipal', 'nombre_empresa')
+                    ->searchable()
+                    ->preload()
+                    ->nullable(),
                 TextInput::make('token')
                     ->label('Token')
                     ->required(),
@@ -57,6 +63,7 @@ class ClienteResource extends Resource
                 TextColumn::make('id_cliente')->label('ID Cliente'),
                 TextColumn::make('nombre_empresa')->label('Nombre Empresa'),
                 TextColumn::make('plan.nombre')->label('Plan'),  // Relación con la tabla planes
+                TextColumn::make('empresaPrincipal.nombre_empresa')->label('Empresa Principal')->searchable()->sortable(),
                 TextColumn::make('token')->label('Token'),
                 TextColumn::make('id_account')->label('ID de la Cuenta'),
                 TextColumn::make('email')->label('Email'),

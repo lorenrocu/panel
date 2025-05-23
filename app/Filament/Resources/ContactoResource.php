@@ -22,6 +22,11 @@ use App\Traits\HasNavigationConfig;
 
 class ContactoResource extends Resource
 {
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole('admin');
+    }
+    
     use HasSuperAdminAccess, HasNavigationConfig;
 
     protected static ?string $model = Contacto::class;
