@@ -58,33 +58,42 @@ class CampanaFacebookResource extends Resource
 
     public static function form(Form $form): Form
     {
-        return $form
-            ->schema([
-                Select::make('id_cliente')
+        $user = auth()->user();
+        $schema = [];
+
+        if (!$user->hasRole('client')) {
+            $schema[] = Select::make('id_cliente')
                 ->label('Empresa')
-                ->options(Cliente::all()->pluck('nombre_empresa', 'id_cliente'))  // Cambia 'id' por 'id_cliente'
+                ->options(Cliente::all()->pluck('nombre_empresa', 'id_cliente'))
                 ->required()
                 ->reactive()
                 ->afterStateUpdated(function ($state, callable $set) {
                     $cliente = Cliente::find($state);
                     $set('id_account', $cliente ? $cliente->id_account : null);
-                }),
-    
-                TextInput::make('id_account')
-                    ->label('ID de la Cuenta')
-                    ->disabled() // Este campo será llenado automáticamente
-                    ->required(),
-    
-                TextInput::make('id_campana')
-                    ->label('ID de la Campaña')
-                    ->required(),
-    
-                TextInput::make('utm_source')->label('UTM Source')->nullable(),
-                TextInput::make('utm_medium')->label('UTM Medium')->nullable(),
-                TextInput::make('utm_term')->label('UTM Term')->nullable(),
-                TextInput::make('utm_content')->label('UTM Content')->nullable(),
-                TextInput::make('utm_campaign')->label('UTM Campaign')->nullable(),
-            ]);
+                });
+            $schema[] = TextInput::make('id_account')
+                ->label('ID de la Cuenta')
+                ->disabled()
+                ->required();
+        } else {
+            // Si es cliente, podríamos querer asignar el id_cliente automáticamente
+            // y ocultar el campo, o si tiene varios clientes asignados, permitirle seleccionar
+            // Por ahora, lo ocultamos y asumimos que se gestiona en otro lado o no es editable por el cliente.
+            // También ocultamos id_account ya que depende de id_cliente
+        }
+
+        $schema = array_merge($schema, [
+            TextInput::make('id_campana')
+                ->label('ID de la Campaña')
+                ->required(),
+            TextInput::make('utm_source')->label('UTM Source')->nullable(),
+            TextInput::make('utm_medium')->label('UTM Medium')->nullable(),
+            TextInput::make('utm_term')->label('UTM Term')->nullable(),
+            TextInput::make('utm_content')->label('UTM Content')->nullable(),
+            TextInput::make('utm_campaign')->label('UTM Campaign')->nullable(),
+        ]);
+
+        return $form->schema($schema);
     }
 
     public static function table(Table $table): Table

@@ -32,11 +32,8 @@ class ListCampanaFacebooks extends ListRecords
                         $cliente = $user->clientes()->first();
                         if ($cliente) {
                             $conditionalFields[] = Forms\Components\Hidden::make('id_cliente')->default($cliente->id_cliente);
-                            $conditionalFields[] = TextInput::make('id_account')
-                                ->label('ID de la Cuenta')
-                                ->default($cliente->id_account)
-                                ->disabled()
-                                ->required();
+                            // El campo id_account se omite aquí para ocultarlo al rol 'client'
+                            // Su valor se gestionará internamente en mutateFormDataUsing y en la acción.
                         } else {
                             // Manejo si el cliente no tiene cliente asociado
                             $conditionalFields[] = Select::make('id_cliente')
@@ -48,10 +45,7 @@ class ListCampanaFacebooks extends ListRecords
                                     $cliente = Cliente::find($state);
                                     $set('id_account', $cliente ? $cliente->id_account : null);
                                 });
-                            $conditionalFields[] = TextInput::make('id_account')
-                                ->label('ID de la Cuenta')
-                                ->disabled() // Se llenará reactivamente
-                                ->required();
+                            // El campo id_account también se omite aquí para el rol 'client' en este caso.
                         }
                     } else {
                         $conditionalFields[] = Select::make('id_cliente')
