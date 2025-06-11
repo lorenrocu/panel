@@ -1,0 +1,93 @@
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use App\Models\Cliente;
+
+class UpdateContactNameChatwoot extends Command
+{
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'chatwoot:update-contact-name {account_id} {contact_id} {name}';
+
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'Actualiza el nombre de un contacto en Chatwoot agregando "- Prospecto"';
+
+    /**
+     * Execute the console command.
+     */
+    public function handle()
+    {
+        $accountId = $this->argument('account_id');
+        $contactId = $this->argument('contact_id');
+        $name = $this->argument('name');
+
+        // Verificar si el nombre ya contiene "- Prospecto"
+        if (preg_match('/\s*-\s*Prospecto$/', $name)) {
+            $this->info("El nombre ya contiene '- Prospecto', no se realizará la actualización");
+            Log::info("Nombre ya contiene '- Prospecto', no se actualiza", [
+                'account_id' => $accountId,
+                'contact_id' => $contactId,
+                'name' => $name
+            ]);
+            return 0;
+        }
+
+        // Buscar el cliente por id_account
+        $cliente = Cliente::where('id_account', $accountId)->first();
+
+        if (!$cliente) {
+            $this->error("No se encontró un cliente con id_account: {$accountId}");
+            Log::error("No se encontró un cliente con id_account: {$accountId}");
+            return 1;
+        }
+
+        // Construir el nuevo nombre
+        $newName = "{$name} - Prospecto";
+
+        try {
+            // Realizar la petición PUT a la API de Chatwoot
+            $response = Http::withHeaders([
+                'api_access_token' => $cliente->token
+            ])->put("https://app.fasiacrm.com/api/v1/accounts/{$accountId}/contacts/{$contactId}", [
+                'name' => $newName
+            ]);
+
+            if ($response->successful()) {
+                $this->info("Nombre actualizado exitosamente para el contacto {$contactId}");
+                Log::info("Nombre actualizado exitosamente", [
+                    'account_id' => $accountId,
+                    'contact_id' => $contactId,
+                    'new_name' => $newName
+                ]);
+                return 0;
+            } else {
+                $this->error("Error al actualizar el nombre: " . $response->body());
+                Log::error("Error al actualizar el nombre", [
+                    'account_id' => $accountId,
+                    'contact_id' => $contactId,
+                    'response' => $response->body()
+                ]);
+                return 1;
+            }
+        } catch (\Exception $e) {
+            $this->error("Error en la petición: " . $e->getMessage());
+            Log::error("Error en la petición", [
+                'account_id' => $accountId,
+                'contact_id' => $contactId,
+                'error' => $e->getMessage()
+            ]);
+            return 1;
+        }
+    }
+} 

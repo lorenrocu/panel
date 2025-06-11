@@ -9,6 +9,7 @@ use App\Models\Cliente;
 use App\Models\LabelPersonalizado;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Artisan;
 
 class ContactoActualizadoController extends Controller
 {
@@ -112,144 +113,78 @@ class ContactoActualizadoController extends Controller
         // Función para generar códigos de labels, verificando labels existentes
         function generarCodigosLabels($arrayAtributo, $prefix, &$existingLabelsMapping)
         {
-            $valoresEstaticos = [];
-            $contador = 1; // Iniciar el contador
-
-            // Extraer códigos existentes para evitar duplicados
-            $existingCodes = [];
-            foreach ($existingLabelsMapping as $valorLower => $codigoLabel) {
-                $parts = explode('_', $codigoLabel, 2);
-                if (count($parts) == 2) {
-                    $existingCodes[] = $parts[0]; // Solo el código (e.g., 't01')
-                }
-            }
-
+            $codigosLabels = [];
             foreach ($arrayAtributo as $valor) {
                 $valorLower = mb_strtolower($valor);
-
-                // Omitir 'n/a' o 'sin seleccionar'
-                if ($valorLower === 'n/a' || $valorLower === 'sin seleccionar') {
-                    continue;
+                $codigo = $prefix . '_' . str_replace(' ', '_', $valorLower);
+                
+                // Verificar si el código ya existe en el mapping
+                if (!isset($existingLabelsMapping[$codigo])) {
+                    $existingLabelsMapping[$codigo] = $valor;
                 }
-
-                // Verificar si este valor de atributo ya tiene un código
-                if (isset($existingLabelsMapping[$valorLower])) {
-                    $codigoLabel = $existingLabelsMapping[$valorLower];
-                } else {
-                    // Asignar un nuevo código
-                    // Encontrar el siguiente código disponible
-                    do {
-                        $nextCode = $prefix . str_pad($contador, 2, '0', STR_PAD_LEFT);
-                        $contador++;
-                    } while (in_array($nextCode, $existingCodes));
-
-                    // Generar el label completo
-                    $codigoLabel = $nextCode . '_' . strtolower(str_replace(' ', '-', $valor));
-
-                    // Actualizar los mapeos
-                    $existingLabelsMapping[$valorLower] = $codigoLabel;
-                    $existingCodes[] = $nextCode;
-                }
-
-                $valoresEstaticos[$valorLower] = $codigoLabel;
+                
+                $codigosLabels[] = $codigo;
             }
-
-            return $valoresEstaticos;
+            return $codigosLabels;
         }
 
-        // **Fin de la función actualizada**
+        // **Procesar los atributos y generar códigos de labels**
 
-        // **Procesamiento de atributos**
+        // Mapeo de valores estáticos para tipo_contacto
+        $valoresEstaticosTipo = [
+            'prospecto' => 'tipo_contacto_prospecto',
+            'cliente' => 'tipo_contacto_cliente',
+            'excluido' => 'tipo_contacto_excluido',
+            'n/a' => null,
+            'sin seleccionar' => null
+        ];
 
-        // Procesar 'tipo_contacto' y 'estado_contacto'
+        // Mapeo de valores estáticos para estado_contacto
+        $valoresEstaticosEstado = [
+            'activo' => 'estado_contacto_activo',
+            'inactivo' => 'estado_contacto_inactivo',
+            'n/a' => null,
+            'sin seleccionar' => null
+        ];
+
+        // Mapeo para almacenar los labels existentes
+        $existingLabelsMapping = [];
+
+        // Procesar tipo_contacto
         $arrayTipoContacto = procesarAtributo('tipo_contacto', $tipoContacto, $accountId);
+        $codigosLabelsTipo = generarCodigosLabels($arrayTipoContacto, 'tipo_contacto', $existingLabelsMapping);
+
+        // Procesar estado_contacto
         $arrayEstadoContacto = procesarAtributo('estado_contacto', $estadoContacto, $accountId);
+        $codigosLabelsEstado = generarCodigosLabels($arrayEstadoContacto, 'estado_contacto', $existingLabelsMapping);
 
-        // **Construir mapeo de labels existentes**
+        // **Verificar y crear labels en la base de datos**
 
-        // Obtener labels existentes de las bases de datos local y remota
-        $existingLocalLabels = LabelPersonalizado::where('id_account', $accountId)
-            ->pluck('valor_label')
-            ->toArray();
-
-        $existingRemoteLabels = DB::connection('pgsql_chatwoot')
+        // Verificar labels existentes en la base de datos
+        $existingLabels = DB::connection('pgsql_chatwoot')
             ->table('labels')
-            ->where('account_id', $accountId)
+            ->whereIn('title', array_keys($existingLabelsMapping))
             ->pluck('title')
             ->toArray();
 
-        // Combinar labels locales y remotos
-        $allExistingLabels = array_unique(array_merge($existingLocalLabels, $existingRemoteLabels));
+        // Filtrar labels que no existen
+        $newLabels = array_diff(array_keys($existingLabelsMapping), $existingLabels);
 
-        // Construir un mapeo de valores de atributos a códigos de labels
-        $existingLabelsMapping = [];
-
-        foreach ($allExistingLabels as $labelTitle) {
-            // Dividir el labelTitle en el primer '_'
-            $parts = explode('_', $labelTitle, 2);
-            if (count($parts) == 2) {
-                $code = $parts[0];
-                $valor = $parts[1];
-
-                // Revertir las transformaciones para obtener el valor del atributo
-                $valorAttribute = str_replace('-', ' ', $valor);
-                $valorLower = mb_strtolower($valorAttribute);
-
-                // Almacenar en el mapeo
-                $existingLabelsMapping[$valorLower] = $labelTitle; // El título completo del label incluye código y valor
-            }
-        }
-
-        // **Generar códigos de labels utilizando el mapeo existente**
-
-        // Generar códigos de labels para 'tipo_contacto' y 'estado_contacto' usando el mapeo de labels existentes
-        $valoresEstaticosTipo = generarCodigosLabels($arrayTipoContacto, 't', $existingLabelsMapping);
-        $valoresEstaticosEstado = generarCodigosLabels($arrayEstadoContacto, 'e', $existingLabelsMapping);
-
-        // **Continuación del código original**
-
-        // Preparar labels necesarios
-        $labelsNecesarios = array_merge($valoresEstaticosTipo, $valoresEstaticosEstado);
-
-        // Determinar labels que faltan en la base de datos local
-        $labelsFaltantesLocal = array_diff($labelsNecesarios, $existingLocalLabels);
-
-        // Preparar datos para insertar en la base de datos local
-        $datosLabelsLocal = [];
-        foreach ($labelsFaltantesLocal as $codigoLabel) {
-            $datosLabelsLocal[] = [
-                'id_account' => $accountId,
-                'valor_label' => $codigoLabel,
-                'id_cliente' => $cliente ? $cliente->id_cliente : null,
-            ];
-        }
-
-        // Insertar labels faltantes en la base de datos local
-        if (!empty($datosLabelsLocal)) {
-            LabelPersonalizado::insert($datosLabelsLocal);
-        }
-
-        // Determinar labels que faltan en la base de datos remota
-        $labelsFaltantesRemoto = array_diff($labelsNecesarios, $existingRemoteLabels);
-
-        // Preparar datos para insertar en la base de datos remota
+        // Preparar datos para insertar nuevos labels
         $datosLabelsRemoto = [];
-        foreach ($labelsFaltantesRemoto as $codigoLabel) {
-            // Generar un color aleatorio para el label
-            $color = '#' . str_pad(dechex(mt_rand(0, 0xFFFFFF)), 6, '0', STR_PAD_LEFT);
-
+        foreach ($newLabels as $codigo) {
             $datosLabelsRemoto[] = [
-                'title' => $codigoLabel,
-                'description' => $codigoLabel,
-                'color' => $color,
-                'show_on_sidebar' => 't',
+                'title' => $codigo,
+                'description' => $existingLabelsMapping[$codigo],
+                'color' => '#1f93ff',
+                'show_on_sidebar' => true,
                 'account_id' => $accountId,
                 'created_at' => now(),
-                'updated_at' => now(),
+                'updated_at' => now()
             ];
         }
 
-        // Insertar labels faltantes en la base de datos remota
+        // Insertar nuevos labels en la base de datos
         $labelInserted = false;
         if (!empty($datosLabelsRemoto)) {
             DB::connection('pgsql_chatwoot')->table('labels')->insert($datosLabelsRemoto);
@@ -346,5 +281,67 @@ class ContactoActualizadoController extends Controller
         return response()->json([
             'mensaje' => 'Datos de contacto actualizados y registrados correctamente.'
         ], 200);
+    }
+
+    /**
+     * Maneja la creación de un nuevo contacto.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function contactoCreado(Request $request)
+    {
+        try {
+            $data = $request->all();
+            Log::info('Datos recibidos en contactoCreado:', $data);
+
+            // Extraer los datos necesarios
+            $accountId = $data['account']['id'] ?? null;
+            $contactId = $data['id'] ?? null;
+            $name = $data['name'] ?? null;
+
+            if (!$accountId || !$contactId || !$name) {
+                Log::error('Faltan datos requeridos', [
+                    'account_id' => $accountId,
+                    'contact_id' => $contactId,
+                    'name' => $name
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Faltan datos requeridos'
+                ], 400);
+            }
+
+            // Ejecutar el comando para actualizar el nombre
+            $exitCode = Artisan::call('chatwoot:update-contact-name', [
+                'account_id' => $accountId,
+                'contact_id' => $contactId,
+                'name' => $name
+            ]);
+
+            if ($exitCode === 0) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Contacto actualizado exitosamente'
+                ], 200);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al actualizar el contacto'
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Error en contactoCreado:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al procesar la solicitud',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

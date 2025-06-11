@@ -33,6 +33,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::prefix('v1/chatwoot')->group(function () {
     Route::post('/contacto-actualizado', [ContactoActualizadoController::class, 'contactoActualizado']);
     Route::post('/actualizar-contacto-atributos', [ChatwootController::class, 'actualizarContactoAtributos']);
+    Route::post('/contacto-creado', [ContactoActualizadoController::class, 'contactoCreado']);
 });
 // routes/api.php
 Route::post('/validar-utm-fasia', [FasiaController::class, 'validarUtmFasia']);
