@@ -14,14 +14,14 @@ class UpdateContactNameChatwoot extends Command
      *
      * @var string
      */
-    protected $signature = 'chatwoot:update-contact-name {account_id} {contact_id} {name}';
+    protected $signature = 'chatwoot:update-contact-name {account_id} {contact_id} {name} {--type=}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Actualiza el nombre de un contacto en Chatwoot agregando "- Prospecto"';
+    protected $description = 'Actualiza el nombre de un contacto en Chatwoot. Si se proporciona --type, actualiza el tipo de contacto.';
 
     /**
      * Execute the console command.
@@ -31,17 +31,7 @@ class UpdateContactNameChatwoot extends Command
         $accountId = $this->argument('account_id');
         $contactId = $this->argument('contact_id');
         $name = $this->argument('name');
-
-        // Verificar si el nombre ya contiene "- Prospecto"
-        if (preg_match('/\s*-\s*Prospecto$/', $name)) {
-            $this->info("El nombre ya contiene '- Prospecto', no se realizará la actualización");
-            Log::info("Nombre ya contiene '- Prospecto', no se actualiza", [
-                'account_id' => $accountId,
-                'contact_id' => $contactId,
-                'name' => $name
-            ]);
-            return 0;
-        }
+        $type = $this->option('type');
 
         // Buscar el cliente por id_account
         $cliente = Cliente::where('id_account', $accountId)->first();
@@ -52,8 +42,24 @@ class UpdateContactNameChatwoot extends Command
             return 1;
         }
 
-        // Construir el nuevo nombre
-        $newName = "{$name} - Prospecto";
+        // Si se proporciona un tipo, actualizar el nombre con el tipo
+        if ($type) {
+            // Usar regex para reemplazar el tipo de contacto
+            // Primero intentamos el patrón con dos guiones (ej: "Nombre - Empresa - Tipo")
+            $newName = preg_replace('/\s*-\s*[^-]+\s*-\s*[^-]+$/', ' - ' . $type, $name);
+            
+            // Si no hubo cambios (no encontró dos guiones), intentamos con un solo guión
+            if ($newName === $name) {
+                $newName = preg_replace('/\s*-\s*[^-]+$/', ' - ' . $type, $name);
+            }
+        } else {
+            // Si no se proporciona tipo, agregar "- Prospecto" si no existe
+            if (!preg_match('/\s*-\s*Prospecto$/', $name)) {
+                $newName = "{$name} - Prospecto";
+            } else {
+                $newName = $name;
+            }
+        }
 
         try {
             // Realizar la petición PUT a la API de Chatwoot

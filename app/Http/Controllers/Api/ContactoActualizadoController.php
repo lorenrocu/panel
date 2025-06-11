@@ -306,13 +306,14 @@ class ContactoActualizadoController extends Controller
                             $exitCode = Artisan::call('chatwoot:update-contact-name', [
                                 'account_id' => $accountId,
                                 'contact_id' => $id,
-                                'name' => $newName
+                                'name' => $currentName,
+                                '--type' => $currentValue['tipo_contacto']
                             ]);
 
                             if ($exitCode === 0) {
                                 Log::channel('chatwoot_api')->info('Nombre del contacto actualizado correctamente usando el comando', [
                                     'old_name' => $currentName,
-                                    'new_name' => $newName,
+                                    'new_name' => $currentValue['tipo_contacto'],
                                     'tipo_contacto' => $currentValue['tipo_contacto']
                                 ]);
                             } else {
