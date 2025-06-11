@@ -292,34 +292,36 @@ class ContactoActualizadoController extends Controller
                         // Obtener el nombre actual
                         $currentName = $data['name'] ?? '';
                         
-                        // Extraer la parte antes del guión
-                        $nameParts = explode(' - ', $currentName);
-                        if (count($nameParts) > 1) {
-                            // Tomar solo la primera parte (nombre) y agregar el nuevo tipo_contacto
-                            $newName = trim($nameParts[0]) . ' - ' . $currentValue['tipo_contacto'];
-                            
-                            // Usar el comando Artisan para actualizar el nombre
-                            try {
-                                $exitCode = Artisan::call('chatwoot:update-contact-name', [
-                                    'account_id' => $accountId,
-                                    'contact_id' => $id,
-                                    'name' => $newName
-                                ]);
+                        // Usar regex para reemplazar el tipo de contacto
+                        // Primero intentamos el patrón con dos guiones (ej: "Nombre - Empresa - Tipo")
+                        $newName = preg_replace('/\s*-\s*[^-]+\s*-\s*[^-]+$/', ' - ' . $currentValue['tipo_contacto'], $currentName);
+                        
+                        // Si no hubo cambios (no encontró dos guiones), intentamos con un solo guión
+                        if ($newName === $currentName) {
+                            $newName = preg_replace('/\s*-\s*[^-]+$/', ' - ' . $currentValue['tipo_contacto'], $currentName);
+                        }
+                        
+                        // Usar el comando Artisan para actualizar el nombre
+                        try {
+                            $exitCode = Artisan::call('chatwoot:update-contact-name', [
+                                'account_id' => $accountId,
+                                'contact_id' => $id,
+                                'name' => $newName
+                            ]);
 
-                                if ($exitCode === 0) {
-                                    Log::channel('chatwoot_api')->info('Nombre del contacto actualizado correctamente usando el comando', [
-                                        'old_name' => $currentName,
-                                        'new_name' => $newName,
-                                        'tipo_contacto' => $currentValue['tipo_contacto']
-                                    ]);
-                                } else {
-                                    Log::channel('chatwoot_api')->error('Error al actualizar el nombre del contacto usando el comando', [
-                                        'exit_code' => $exitCode
-                                    ]);
-                                }
-                            } catch (\Exception $e) {
-                                Log::channel('chatwoot_api')->error('Error al ejecutar el comando de actualización: ' . $e->getMessage());
+                            if ($exitCode === 0) {
+                                Log::channel('chatwoot_api')->info('Nombre del contacto actualizado correctamente usando el comando', [
+                                    'old_name' => $currentName,
+                                    'new_name' => $newName,
+                                    'tipo_contacto' => $currentValue['tipo_contacto']
+                                ]);
+                            } else {
+                                Log::channel('chatwoot_api')->error('Error al actualizar el nombre del contacto usando el comando', [
+                                    'exit_code' => $exitCode
+                                ]);
                             }
+                        } catch (\Exception $e) {
+                            Log::channel('chatwoot_api')->error('Error al ejecutar el comando de actualización: ' . $e->getMessage());
                         }
                     }
                 }
