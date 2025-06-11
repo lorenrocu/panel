@@ -39,6 +39,54 @@ class ContactoActualizadoController extends Controller
         // Extraer "account.id"
         $accountId = $data['account']['id'] ?? null;
 
+        // Actualizar el nombre del contacto si el tipo_contacto ha cambiado
+        if (isset($data['changed_attributes'])) {
+            foreach ($data['changed_attributes'] as $change) {
+                if (isset($change['custom_attributes'])) {
+                    $previousValue = $change['custom_attributes']['previous_value'] ?? [];
+                    $currentValue = $change['custom_attributes']['current_value'] ?? [];
+                    
+                    // Verificar si el tipo_contacto ha cambiado
+                    if (isset($previousValue['tipo_contacto']) && isset($currentValue['tipo_contacto']) 
+                        && $previousValue['tipo_contacto'] !== $currentValue['tipo_contacto']) {
+                        
+                        // Obtener el nombre actual
+                        $currentName = $data['name'] ?? '';
+                        
+                        // Extraer la parte antes del guión
+                        $nameParts = explode(' - ', $currentName);
+                        if (count($nameParts) > 1) {
+                            // Construir el nuevo nombre con el nuevo tipo_contacto
+                            $newName = $nameParts[0] . ' - ' . $currentValue['tipo_contacto'];
+                            
+                            // Actualizar el nombre en Chatwoot
+                            try {
+                                $response = Http::withHeaders([
+                                    'api_access_token' => $token,
+                                ])->patch("{$urlChatwoot}/api/v1/accounts/{$accountId}/contacts/{$id}", [
+                                    'name' => $newName
+                                ]);
+
+                                if ($response->successful()) {
+                                    Log::channel('chatwoot_api')->info('Nombre del contacto actualizado correctamente', [
+                                        'old_name' => $currentName,
+                                        'new_name' => $newName,
+                                        'tipo_contacto' => $currentValue['tipo_contacto']
+                                    ]);
+                                } else {
+                                    Log::channel('chatwoot_api')->error('Error al actualizar el nombre del contacto', [
+                                        'response' => $response->body()
+                                    ]);
+                                }
+                            } catch (\Exception $e) {
+                                Log::channel('chatwoot_api')->error('Error al actualizar el nombre del contacto: ' . $e->getMessage());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Buscar el cliente en la tabla clientes basado en account.id
         $cliente = Cliente::where('id_account', $accountId)->first();
 
