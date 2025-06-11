@@ -295,8 +295,8 @@ class ContactoActualizadoController extends Controller
                         // Extraer la parte antes del guión
                         $nameParts = explode(' - ', $currentName);
                         if (count($nameParts) > 1) {
-                            // Construir el nuevo nombre con el nuevo tipo_contacto
-                            $newName = $nameParts[0] . ' - ' . $currentValue['tipo_contacto'];
+                            // Tomar solo la primera parte (nombre) y agregar el nuevo tipo_contacto
+                            $newName = trim($nameParts[0]) . ' - ' . $currentValue['tipo_contacto'];
                             
                             // Usar el comando Artisan para actualizar el nombre
                             try {
