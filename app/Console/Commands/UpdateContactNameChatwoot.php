@@ -44,13 +44,12 @@ class UpdateContactNameChatwoot extends Command
 
         // Si se proporciona un tipo, actualizar el nombre con el tipo
         if ($type) {
-            // Usar regex para reemplazar el tipo de contacto
-            // Primero intentamos el patrón con dos guiones (ej: "Nombre - Empresa - Tipo")
-            $newName = preg_replace('/\s*-\s*[^-]+\s*-\s*[^-]+$/', ' - ' . $type, $name);
+            // Usar regex para reemplazar solo la última parte después del último guión
+            $newName = preg_replace('/\s*-\s*[^-]+$/', ' - ' . $type, $name);
             
-            // Si no hubo cambios (no encontró dos guiones), intentamos con un solo guión
+            // Si no hubo cambios, significa que no había guiones, entonces agregamos el tipo
             if ($newName === $name) {
-                $newName = preg_replace('/\s*-\s*[^-]+$/', ' - ' . $type, $name);
+                $newName = $name . ' - ' . $type;
             }
         } else {
             // Si no se proporciona tipo, agregar "- Prospecto" si no existe
