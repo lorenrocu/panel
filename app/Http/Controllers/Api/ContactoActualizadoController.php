@@ -31,6 +31,9 @@ class ContactoActualizadoController extends Controller
         // Extraer el campo "id" a nivel raíz
         $id = $data['id'] ?? null;
 
+        // Extraer "account.id"
+        $accountId = $data['account']['id'] ?? null;
+
         // Extraer los campos de "custom_attributes"
         $customAttributes = $data['custom_attributes'] ?? [];
         $tipoContacto = $customAttributes['tipo_contacto'] ?? 'N/A';
@@ -43,9 +46,6 @@ class ContactoActualizadoController extends Controller
             'tipo_contacto' => $tipoContacto,
             'estado_contacto' => $estadoContacto
         ]);
-
-        // Extraer "account.id"
-        $accountId = $data['account']['id'] ?? null;
 
         // Buscar el cliente en la tabla clientes basado en account.id
         $cliente = Cliente::where('id_account', $accountId)->first();
