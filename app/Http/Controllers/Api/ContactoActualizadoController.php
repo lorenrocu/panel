@@ -430,11 +430,12 @@ class ContactoActualizadoController extends Controller
                 ], 400);
             }
 
-            // Ejecutar el comando para actualizar el nombre
+            // Ejecutar el comando para actualizar el nombre con tipo por defecto
             $exitCode = Artisan::call('chatwoot:update-contact-name', [
                 'account_id' => $accountId,
                 'contact_id' => $contactId,
-                'name' => $name
+                'name' => $name,
+                '--type' => 'Prospecto'
             ]);
 
             if ($exitCode === 0) {
