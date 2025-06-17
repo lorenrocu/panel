@@ -9,6 +9,7 @@ use App\Models\Cliente;
 use App\Models\LabelPersonalizado;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Artisan;
 
 class ContactoActualizadoController extends Controller
 {
@@ -348,7 +349,7 @@ class ContactoActualizadoController extends Controller
 
                                 if (!empty($currentName)) {
                                     // Actualizar el nombre usando el comando existente con el nuevo tipo
-                                    $exitCode = \Illuminate\Support\Facades\Artisan::call('chatwoot:update-contact-name', [
+                                    $exitCode = Artisan::call('chatwoot:update-contact-name', [
                                         'account_id' => $accountId,
                                         'contact_id' => $id,
                                         'name' => $currentName,
