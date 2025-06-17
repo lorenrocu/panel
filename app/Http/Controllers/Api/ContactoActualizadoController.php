@@ -333,6 +333,58 @@ class ContactoActualizadoController extends Controller
                             'response' => $responseLabels->body(),
                         ]);
                     }
+
+                    // **Actualizar el nombre del contacto si cambió el tipo_contacto**
+                    if ($tipoContacto !== 'N/A' && $tipoContacto !== 'Sin Seleccionar') {
+                        try {
+                            // Obtener el nombre actual del contacto
+                            $contactResponse = Http::withHeaders([
+                                'api_access_token' => $token,
+                            ])->get("{$urlChatwoot}/api/v1/accounts/{$accountId}/contacts/{$id}");
+
+                            if ($contactResponse->successful()) {
+                                $contactData = $contactResponse->json();
+                                $currentName = $contactData['payload']['contact']['name'] ?? '';
+
+                                if (!empty($currentName)) {
+                                    // Actualizar el nombre usando el comando existente con el nuevo tipo
+                                    $exitCode = \Illuminate\Support\Facades\Artisan::call('chatwoot:update-contact-name', [
+                                        'account_id' => $accountId,
+                                        'contact_id' => $id,
+                                        'name' => $currentName,
+                                        '--type' => $tipoContacto
+                                    ]);
+
+                                    if ($exitCode === 0) {
+                                        Log::channel('chatwoot_api')->info('Nombre del contacto actualizado exitosamente con nuevo tipo', [
+                                            'contact_id' => $id,
+                                            'account_id' => $accountId,
+                                            'tipo_contacto' => $tipoContacto,
+                                            'nombre_original' => $currentName
+                                        ]);
+                                    } else {
+                                        Log::channel('chatwoot_api')->error('Error al actualizar el nombre del contacto', [
+                                            'contact_id' => $id,
+                                            'account_id' => $accountId,
+                                            'tipo_contacto' => $tipoContacto
+                                        ]);
+                                    }
+                                }
+                            } else {
+                                Log::channel('chatwoot_api')->error('Error al obtener datos del contacto para actualizar nombre', [
+                                    'contact_id' => $id,
+                                    'account_id' => $accountId,
+                                    'response' => $contactResponse->body()
+                                ]);
+                            }
+                        } catch (\Exception $e) {
+                            Log::channel('chatwoot_api')->error('Excepción al actualizar nombre del contacto: ' . $e->getMessage(), [
+                                'contact_id' => $id,
+                                'account_id' => $accountId,
+                                'tipo_contacto' => $tipoContacto
+                            ]);
+                        }
+                    }
                 } else {
                     Log::channel('chatwoot_api')->warning('No se encontró id_conversation para contact_id: ' . $id);
                 }
