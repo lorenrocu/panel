@@ -34,6 +34,9 @@ class ContactoActualizadoController extends Controller
         // Extraer "account.id"
         $accountId = $data['account']['id'] ?? null;
 
+        // Extraer el nombre del contacto directamente del webhook
+        $contactName = $data['name'] ?? '';
+        
         // Extraer los campos de "custom_attributes"
         $customAttributes = $data['custom_attributes'] ?? [];
         $tipoContacto = $customAttributes['tipo_contacto'] ?? 'N/A';
@@ -43,6 +46,7 @@ class ContactoActualizadoController extends Controller
         Log::channel('chatwoot_api')->info('Datos recibidos en contactoActualizado:', [
             'contact_id' => $id,
             'account_id' => $accountId,
+            'contact_name' => $contactName,
             'tipo_contacto' => $tipoContacto,
             'estado_contacto' => $estadoContacto
         ]);
@@ -354,68 +358,51 @@ class ContactoActualizadoController extends Controller
                             Log::channel('chatwoot_api')->info('Iniciando actualización de nombre del contacto', [
                                 'contact_id' => $id,
                                 'account_id' => $accountId,
+                                'contact_name_from_webhook' => $contactName,
                                 'tipo_contacto' => $tipoContacto
                             ]);
                             
-                            // Obtener el nombre actual del contacto
-                            $contactResponse = Http::withHeaders([
-                                'api_access_token' => $token,
-                            ])->get("{$urlChatwoot}/api/v1/accounts/{$accountId}/contacts/{$id}");
+                            // Usar el nombre del webhook o asignar uno por defecto si está vacío
+                            $nameToUpdate = !empty($contactName) ? $contactName : 'Contacto';
+                            
+                            Log::channel('chatwoot_api')->info('Nombre a actualizar determinado', [
+                                'contact_id' => $id,
+                                'original_name' => $contactName,
+                                'name_to_update' => $nameToUpdate
+                            ]);
 
-                            if ($contactResponse->successful()) {
-                                $contactData = $contactResponse->json();
-                                $currentName = $contactData['payload']['contact']['name'] ?? '';
-                                
-                                Log::channel('chatwoot_api')->info('Nombre actual del contacto obtenido', [
-                                    'contact_id' => $id,
-                                    'current_name' => $currentName
-                                ]);
-
-                                if (!empty($currentName)) {
-                                    Log::channel('chatwoot_api')->info('Ejecutando comando Artisan para actualizar nombre', [
-                                        'account_id' => $accountId,
-                                        'contact_id' => $id,
-                                        'name' => $currentName,
-                                        'type' => $tipoContacto
-                                    ]);
+                            Log::channel('chatwoot_api')->info('Ejecutando comando Artisan para actualizar nombre', [
+                                'account_id' => $accountId,
+                                'contact_id' => $id,
+                                'name' => $nameToUpdate,
+                                'type' => $tipoContacto
+                            ]);
+                            
+                            // Actualizar el nombre usando el comando existente con el nuevo tipo
+                            $exitCode = Artisan::call('chatwoot:update-contact-name', [
+                                'account_id' => $accountId,
+                                'contact_id' => $id,
+                                'name' => $nameToUpdate,
+                                '--type' => $tipoContacto
+                            ]);
                                     
-                                    // Actualizar el nombre usando el comando existente con el nuevo tipo
-                                    $exitCode = Artisan::call('chatwoot:update-contact-name', [
-                                        'account_id' => $accountId,
-                                        'contact_id' => $id,
-                                        'name' => $currentName,
-                                        '--type' => $tipoContacto
-                                    ]);
-                                    
-                                    Log::channel('chatwoot_api')->info('Comando Artisan ejecutado', [
-                                        'exit_code' => $exitCode
-                                    ]);
+                            Log::channel('chatwoot_api')->info('Comando Artisan ejecutado', [
+                                'exit_code' => $exitCode
+                            ]);
 
-                                    if ($exitCode === 0) {
-                                        Log::channel('chatwoot_api')->info('Nombre del contacto actualizado exitosamente con nuevo tipo', [
-                                            'contact_id' => $id,
-                                            'account_id' => $accountId,
-                                            'tipo_contacto' => $tipoContacto,
-                                            'nombre_original' => $currentName
-                                        ]);
-                                    } else {
-                                        Log::channel('chatwoot_api')->error('Error al actualizar el nombre del contacto', [
-                                            'contact_id' => $id,
-                                            'account_id' => $accountId,
-                                            'tipo_contacto' => $tipoContacto
-                                        ]);
-                                    }
-                                } else {
-                                    Log::channel('chatwoot_api')->warning('Nombre del contacto está vacío, no se puede actualizar', [
-                                        'contact_id' => $id,
-                                        'account_id' => $accountId
-                                    ]);
-                                }
-                            } else {
-                                Log::channel('chatwoot_api')->error('Error al obtener datos del contacto para actualizar nombre', [
+                            if ($exitCode === 0) {
+                                Log::channel('chatwoot_api')->info('Nombre del contacto actualizado exitosamente con nuevo tipo', [
                                     'contact_id' => $id,
                                     'account_id' => $accountId,
-                                    'response' => $contactResponse->body()
+                                    'tipo_contacto' => $tipoContacto,
+                                    'nombre_usado' => $nameToUpdate
+                                ]);
+                            } else {
+                                Log::channel('chatwoot_api')->error('Error al actualizar el nombre del contacto', [
+                                    'contact_id' => $id,
+                                    'account_id' => $accountId,
+                                    'tipo_contacto' => $tipoContacto,
+                                    'exit_code' => $exitCode
                                 ]);
                             }
                         } catch (\Exception $e) {
