@@ -35,6 +35,14 @@ class ContactoActualizadoController extends Controller
         $customAttributes = $data['custom_attributes'] ?? [];
         $tipoContacto = $customAttributes['tipo_contacto'] ?? 'N/A';
         $estadoContacto = $customAttributes['estado_contacto'] ?? 'N/A';
+        
+        // Log para debugging
+        Log::channel('chatwoot_api')->info('Datos recibidos en contactoActualizado:', [
+            'contact_id' => $id,
+            'account_id' => $accountId,
+            'tipo_contacto' => $tipoContacto,
+            'estado_contacto' => $estadoContacto
+        ]);
 
         // Extraer "account.id"
         $accountId = $data['account']['id'] ?? null;
@@ -335,7 +343,12 @@ class ContactoActualizadoController extends Controller
                         ]);
                     }
 
-                    // **Actualizar el nombre del contacto si cambió el tipo_contacto**
+                    // **Actualizar el nombre del contacto si hay un tipo_contacto válido**
+                    Log::channel('chatwoot_api')->info('Verificando actualización de nombre:', [
+                        'tipo_contacto' => $tipoContacto,
+                        'condicion' => ($tipoContacto !== 'N/A' && $tipoContacto !== 'Sin Seleccionar')
+                    ]);
+                    
                     if ($tipoContacto !== 'N/A' && $tipoContacto !== 'Sin Seleccionar') {
                         try {
                             // Obtener el nombre actual del contacto
