@@ -9,7 +9,6 @@ use App\Models\Cliente;
 use App\Models\LabelPersonalizado;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Artisan;
 
 class ContactoActualizadoController extends Controller
 {
@@ -113,78 +112,144 @@ class ContactoActualizadoController extends Controller
         // Función para generar códigos de labels, verificando labels existentes
         function generarCodigosLabels($arrayAtributo, $prefix, &$existingLabelsMapping)
         {
-            $codigosLabels = [];
+            $valoresEstaticos = [];
+            $contador = 1; // Iniciar el contador
+
+            // Extraer códigos existentes para evitar duplicados
+            $existingCodes = [];
+            foreach ($existingLabelsMapping as $valorLower => $codigoLabel) {
+                $parts = explode('_', $codigoLabel, 2);
+                if (count($parts) == 2) {
+                    $existingCodes[] = $parts[0]; // Solo el código (e.g., 't01')
+                }
+            }
+
             foreach ($arrayAtributo as $valor) {
                 $valorLower = mb_strtolower($valor);
-                $codigo = $prefix . '_' . str_replace(' ', '_', $valorLower);
-                
-                // Verificar si el código ya existe en el mapping
-                if (!isset($existingLabelsMapping[$codigo])) {
-                    $existingLabelsMapping[$codigo] = $valor;
+
+                // Omitir 'n/a' o 'sin seleccionar'
+                if ($valorLower === 'n/a' || $valorLower === 'sin seleccionar') {
+                    continue;
                 }
-                
-                $codigosLabels[] = $codigo;
+
+                // Verificar si este valor de atributo ya tiene un código
+                if (isset($existingLabelsMapping[$valorLower])) {
+                    $codigoLabel = $existingLabelsMapping[$valorLower];
+                } else {
+                    // Asignar un nuevo código
+                    // Encontrar el siguiente código disponible
+                    do {
+                        $nextCode = $prefix . str_pad($contador, 2, '0', STR_PAD_LEFT);
+                        $contador++;
+                    } while (in_array($nextCode, $existingCodes));
+
+                    // Generar el label completo
+                    $codigoLabel = $nextCode . '_' . strtolower(str_replace(' ', '-', $valor));
+
+                    // Actualizar los mapeos
+                    $existingLabelsMapping[$valorLower] = $codigoLabel;
+                    $existingCodes[] = $nextCode;
+                }
+
+                $valoresEstaticos[$valorLower] = $codigoLabel;
             }
-            return $codigosLabels;
+
+            return $valoresEstaticos;
         }
 
-        // **Procesar los atributos y generar códigos de labels**
+        // **Fin de la función actualizada**
 
-        // Mapeo de valores estáticos para tipo_contacto
-        $valoresEstaticosTipo = [
-            'prospecto' => 'tipo_contacto_prospecto',
-            'cliente' => 'tipo_contacto_cliente',
-            'excluido' => 'tipo_contacto_excluido',
-            'n/a' => null,
-            'sin seleccionar' => null
-        ];
+        // **Procesamiento de atributos**
 
-        // Mapeo de valores estáticos para estado_contacto
-        $valoresEstaticosEstado = [
-            'activo' => 'estado_contacto_activo',
-            'inactivo' => 'estado_contacto_inactivo',
-            'n/a' => null,
-            'sin seleccionar' => null
-        ];
-
-        // Mapeo para almacenar los labels existentes
-        $existingLabelsMapping = [];
-
-        // Procesar tipo_contacto
+        // Procesar 'tipo_contacto' y 'estado_contacto'
         $arrayTipoContacto = procesarAtributo('tipo_contacto', $tipoContacto, $accountId);
-        $codigosLabelsTipo = generarCodigosLabels($arrayTipoContacto, 'tipo_contacto', $existingLabelsMapping);
-
-        // Procesar estado_contacto
         $arrayEstadoContacto = procesarAtributo('estado_contacto', $estadoContacto, $accountId);
-        $codigosLabelsEstado = generarCodigosLabels($arrayEstadoContacto, 'estado_contacto', $existingLabelsMapping);
 
-        // **Verificar y crear labels en la base de datos**
+        // **Construir mapeo de labels existentes**
 
-        // Verificar labels existentes en la base de datos
-        $existingLabels = DB::connection('pgsql_chatwoot')
+        // Obtener labels existentes de las bases de datos local y remota
+        $existingLocalLabels = LabelPersonalizado::where('id_account', $accountId)
+            ->pluck('valor_label')
+            ->toArray();
+
+        $existingRemoteLabels = DB::connection('pgsql_chatwoot')
             ->table('labels')
-            ->whereIn('title', array_keys($existingLabelsMapping))
+            ->where('account_id', $accountId)
             ->pluck('title')
             ->toArray();
 
-        // Filtrar labels que no existen
-        $newLabels = array_diff(array_keys($existingLabelsMapping), $existingLabels);
+        // Combinar labels locales y remotos
+        $allExistingLabels = array_unique(array_merge($existingLocalLabels, $existingRemoteLabels));
 
-        // Preparar datos para insertar nuevos labels
-        $datosLabelsRemoto = [];
-        foreach ($newLabels as $codigo) {
-            $datosLabelsRemoto[] = [
-                'title' => $codigo,
-                'description' => $existingLabelsMapping[$codigo],
-                'color' => '#1f93ff',
-                'show_on_sidebar' => true,
-                'account_id' => $accountId,
-                'created_at' => now(),
-                'updated_at' => now()
+        // Construir un mapeo de valores de atributos a códigos de labels
+        $existingLabelsMapping = [];
+
+        foreach ($allExistingLabels as $labelTitle) {
+            // Dividir el labelTitle en el primer '_'
+            $parts = explode('_', $labelTitle, 2);
+            if (count($parts) == 2) {
+                $code = $parts[0];
+                $valor = $parts[1];
+
+                // Revertir las transformaciones para obtener el valor del atributo
+                $valorAttribute = str_replace('-', ' ', $valor);
+                $valorLower = mb_strtolower($valorAttribute);
+
+                // Almacenar en el mapeo
+                $existingLabelsMapping[$valorLower] = $labelTitle; // El título completo del label incluye código y valor
+            }
+        }
+
+        // **Generar códigos de labels utilizando el mapeo existente**
+
+        // Generar códigos de labels para 'tipo_contacto' y 'estado_contacto' usando el mapeo de labels existentes
+        $valoresEstaticosTipo = generarCodigosLabels($arrayTipoContacto, 't', $existingLabelsMapping);
+        $valoresEstaticosEstado = generarCodigosLabels($arrayEstadoContacto, 'e', $existingLabelsMapping);
+
+        // **Continuación del código original**
+
+        // Preparar labels necesarios
+        $labelsNecesarios = array_merge($valoresEstaticosTipo, $valoresEstaticosEstado);
+
+        // Determinar labels que faltan en la base de datos local
+        $labelsFaltantesLocal = array_diff($labelsNecesarios, $existingLocalLabels);
+
+        // Preparar datos para insertar en la base de datos local
+        $datosLabelsLocal = [];
+        foreach ($labelsFaltantesLocal as $codigoLabel) {
+            $datosLabelsLocal[] = [
+                'id_account' => $accountId,
+                'valor_label' => $codigoLabel,
+                'id_cliente' => $cliente ? $cliente->id_cliente : null,
             ];
         }
 
-        // Insertar nuevos labels en la base de datos
+        // Insertar labels faltantes en la base de datos local
+        if (!empty($datosLabelsLocal)) {
+            LabelPersonalizado::insert($datosLabelsLocal);
+        }
+
+        // Determinar labels que faltan en la base de datos remota
+        $labelsFaltantesRemoto = array_diff($labelsNecesarios, $existingRemoteLabels);
+
+        // Preparar datos para insertar en la base de datos remota
+        $datosLabelsRemoto = [];
+        foreach ($labelsFaltantesRemoto as $codigoLabel) {
+            // Generar un color aleatorio para el label
+            $color = '#' . str_pad(dechex(mt_rand(0, 0xFFFFFF)), 6, '0', STR_PAD_LEFT);
+
+            $datosLabelsRemoto[] = [
+                'title' => $codigoLabel,
+                'description' => $codigoLabel,
+                'color' => $color,
+                'show_on_sidebar' => 't',
+                'account_id' => $accountId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        // Insertar labels faltantes en la base de datos remota
         $labelInserted = false;
         if (!empty($datosLabelsRemoto)) {
             DB::connection('pgsql_chatwoot')->table('labels')->insert($datosLabelsRemoto);
@@ -278,121 +343,8 @@ class ContactoActualizadoController extends Controller
             Log::channel('chatwoot_api')->error('Error en la solicitud HTTP: ' . $e->getMessage());
         }
 
-        // Actualizar el nombre del contacto si el tipo_contacto ha cambiado
-        if (isset($data['changed_attributes'])) {
-            foreach ($data['changed_attributes'] as $change) {
-                if (isset($change['custom_attributes'])) {
-                    $previousValue = $change['custom_attributes']['previous_value'] ?? [];
-                    $currentValue = $change['custom_attributes']['current_value'] ?? [];
-                    
-                    // Verificar si el tipo_contacto ha cambiado
-                    if (isset($previousValue['tipo_contacto']) && isset($currentValue['tipo_contacto']) 
-                        && $previousValue['tipo_contacto'] !== $currentValue['tipo_contacto']) {
-                        
-                        // Obtener el nombre actual
-                        $currentName = $data['name'] ?? '';
-                        
-                        // Usar regex para reemplazar el tipo de contacto
-                        // Primero intentamos el patrón con dos guiones (ej: "Nombre - Empresa - Tipo")
-                        $newName = preg_replace('/\s*-\s*[^-]+\s*-\s*[^-]+$/', ' - ' . $currentValue['tipo_contacto'], $currentName);
-                        
-                        // Si no hubo cambios (no encontró dos guiones), intentamos con un solo guión
-                        if ($newName === $currentName) {
-                            $newName = preg_replace('/\s*-\s*[^-]+$/', ' - ' . $currentValue['tipo_contacto'], $currentName);
-                        }
-                        
-                        // Usar el comando Artisan para actualizar el nombre
-                        try {
-                            $exitCode = Artisan::call('chatwoot:update-contact-name', [
-                                'account_id' => $accountId,
-                                'contact_id' => $id,
-                                'name' => $currentName,
-                                '--type' => $currentValue['tipo_contacto']
-                            ]);
-
-                            if ($exitCode === 0) {
-                                Log::channel('chatwoot_api')->info('Nombre del contacto actualizado correctamente usando el comando', [
-                                    'old_name' => $currentName,
-                                    'new_name' => $currentValue['tipo_contacto'],
-                                    'tipo_contacto' => $currentValue['tipo_contacto']
-                                ]);
-                            } else {
-                                Log::channel('chatwoot_api')->error('Error al actualizar el nombre del contacto usando el comando', [
-                                    'exit_code' => $exitCode
-                                ]);
-                            }
-                        } catch (\Exception $e) {
-                            Log::channel('chatwoot_api')->error('Error al ejecutar el comando de actualización: ' . $e->getMessage());
-                        }
-                    }
-                }
-            }
-        }
-
         return response()->json([
             'mensaje' => 'Datos de contacto actualizados y registrados correctamente.'
         ], 200);
-    }
-
-    /**
-     * Maneja la creación de un nuevo contacto.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function contactoCreado(Request $request)
-    {
-        try {
-            $data = $request->all();
-            Log::info('Datos recibidos en contactoCreado:', $data);
-
-            // Extraer los datos necesarios
-            $accountId = $data['account']['id'] ?? null;
-            $contactId = $data['id'] ?? null;
-            $name = $data['name'] ?? null;
-
-            if (!$accountId || !$contactId || !$name) {
-                Log::error('Faltan datos requeridos', [
-                    'account_id' => $accountId,
-                    'contact_id' => $contactId,
-                    'name' => $name
-                ]);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Faltan datos requeridos'
-                ], 400);
-            }
-
-            // Ejecutar el comando para actualizar el nombre
-            $exitCode = Artisan::call('chatwoot:update-contact-name', [
-                'account_id' => $accountId,
-                'contact_id' => $contactId,
-                'name' => $name
-            ]);
-
-            if ($exitCode === 0) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Contacto actualizado exitosamente'
-                ], 200);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Error al actualizar el contacto'
-                ], 500);
-            }
-
-        } catch (\Exception $e) {
-            Log::error('Error en contactoCreado:', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al procesar la solicitud',
-                'error' => $e->getMessage()
-            ], 500);
-        }
     }
 }
