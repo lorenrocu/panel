@@ -347,4 +347,66 @@ class ContactoActualizadoController extends Controller
             'mensaje' => 'Datos de contacto actualizados y registrados correctamente.'
         ], 200);
     }
+
+    /**
+     * Maneja la creación de un nuevo contacto.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function contactoCreado(Request $request)
+    {
+        try {
+            $data = $request->all();
+            Log::info('Datos recibidos en contactoCreado:', $data);
+
+            // Extraer los datos necesarios
+            $accountId = $data['account']['id'] ?? null;
+            $contactId = $data['id'] ?? null;
+            $name = $data['name'] ?? null;
+
+            if (!$accountId || !$contactId || !$name) {
+                Log::error('Faltan datos requeridos', [
+                    'account_id' => $accountId,
+                    'contact_id' => $contactId,
+                    'name' => $name
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Faltan datos requeridos'
+                ], 400);
+            }
+
+            // Ejecutar el comando para actualizar el nombre
+            $exitCode = Artisan::call('chatwoot:update-contact-name', [
+                'account_id' => $accountId,
+                'contact_id' => $contactId,
+                'name' => $name
+            ]);
+
+            if ($exitCode === 0) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Contacto actualizado exitosamente'
+                ], 200);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al actualizar el contacto'
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Error en contactoCreado:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al procesar la solicitud',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
