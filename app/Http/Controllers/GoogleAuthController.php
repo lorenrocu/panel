@@ -27,7 +27,17 @@ class GoogleAuthController extends Controller
         $id_cliente = $request->query('id_cliente');
         Log::info('id_cliente obtenido del request', ['id_cliente' => $id_cliente]);
 
-        $client->setState($id_cliente);
+        // Obtener la URL de referencia (de donde viene el usuario)
+        $referer = $request->headers->get('referer');
+        Log::info('URL de referencia', ['referer' => $referer]);
+
+        // Crear un estado con el id_cliente y la URL de referencia
+        $state = base64_encode(json_encode([
+            'id_cliente' => $id_cliente,
+            'referer' => $referer,
+        ]));
+
+        $client->setState($state);
     
         $authUrl = $client->createAuthUrl();
         Log::info('URL de autenticación generada', ['auth_url' => $authUrl]);
@@ -55,8 +65,17 @@ class GoogleAuthController extends Controller
             return response()->json(['error' => $tokenData['error']], 400);
         }
     
-        $id_cliente = $request->input('state');
-        Log::info('id_cliente obtenido del estado', ['id_cliente' => $id_cliente]);
+        // Decodificar el estado para obtener id_cliente y referer
+        $stateEncoded = $request->input('state');
+        $stateData = json_decode(base64_decode($stateEncoded), true);
+        
+        $id_cliente = $stateData['id_cliente'] ?? null;
+        $referer = $stateData['referer'] ?? null;
+        
+        Log::info('Datos del estado decodificado', [
+            'id_cliente' => $id_cliente,
+            'referer' => $referer
+        ]);
 
         if (!$id_cliente) {
             Log::error('No se recibió id_cliente en el state');
@@ -81,7 +100,23 @@ class GoogleAuthController extends Controller
     
         Log::info('Token guardado exitosamente', ['id_cliente' => $id_cliente]);
 
-        return response()->json(['message' => 'Authenticated successfully']);
+        // Redirigir al usuario de vuelta a la página de origen
+        if ($referer) {
+            Log::info('Redirigiendo al usuario a la URL de referencia', ['referer' => $referer]);
+            return redirect($referer)->with('success', 'Autenticación con Google completada exitosamente');
+        }
+
+        // Si no hay referer, intentar redirigir a la página de edición del cliente
+        try {
+            $editUrl = route('filament.resources.clientes.edit', ['record' => $id_cliente]);
+            Log::info('Redirigiendo a la página de edición mediante ruta nombrada', ['edit_url' => $editUrl]);
+            return redirect($editUrl)->with('success', 'Autenticación con Google completada exitosamente');
+        } catch (\Exception $e) {
+            // Si hay un error con la ruta, construir la URL manualmente
+            $editUrl = url("/admin/clientes/{$id_cliente}/edit");
+            Log::info('Redirigiendo a la página de edición mediante URL manual', ['edit_url' => $editUrl]);
+            return redirect($editUrl)->with('success', 'Autenticación con Google completada exitosamente');
+        }
     }
 
     private function getClientForCustomer($id_cliente)

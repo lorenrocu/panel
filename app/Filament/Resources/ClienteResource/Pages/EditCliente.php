@@ -233,7 +233,6 @@ public function refreshComponent()
                 }),
                 Action::make('Conectar con Google')
                 ->url(route('google.authenticate', ['id_cliente' => $this->record->id_cliente]))
-                ->openUrlInNewTab(true)
                 ->label('Conectar con Google'),
         ];
     }
