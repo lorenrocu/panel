@@ -287,24 +287,22 @@ class GoogleAuthController extends Controller
     
         // Limpiar el nombre eliminando sufijos existentes para evitar duplicación
         $originalName = $validatedData['first_name'];
-        $givenName = $originalName;
         
         Log::info('Nombre original recibido de Chatwoot', ['original_name' => $originalName]);
         
-        // Remover cualquier sufijo "- Prospecto" existente (case insensitive)
-        $givenName = preg_replace('/\s*-\s*[Pp]rospecto\s*$/i', '', $givenName);
-        Log::info('Después de remover "- Prospecto"', ['cleaned_name' => $givenName]);
+        // Extraer solo el nombre base (primera parte antes de cualquier "-")
+        // Esto elimina cualquier sufijo como "- empresa - Prospecto" o "- Prospecto"
+        $parts = explode(' - ', $originalName);
+        $baseName = trim($parts[0]); // Solo el primer segmento (nombre base)
         
-        // Remover cualquier sufijo "- empresa -" si existe
-        $givenName = preg_replace('/\s*-\s*.*?\s*-\s*$/i', '', $givenName);
-        Log::info('Después de remover sufijos de empresa', ['cleaned_name' => $givenName]);
+        Log::info('Nombre base extraído', ['base_name' => $baseName]);
         
         // Reconstruir el nombre con el formato correcto
         if ($email && !empty($empresa)) {
-            $givenName .= ' - ' . $empresa . ' - Prospecto';
+            $givenName = $baseName . ' - ' . $empresa . ' - Prospecto';
             Log::info('Nombre reconstruido con empresa', ['final_name' => $givenName, 'empresa' => $empresa]);
         } else {
-            $givenName .= ' - Prospecto';
+            $givenName = $baseName . ' - Prospecto';
             Log::info('Nombre reconstruido sin empresa', ['final_name' => $givenName]);
         }
 
