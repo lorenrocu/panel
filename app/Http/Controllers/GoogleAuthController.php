@@ -240,99 +240,12 @@ class GoogleAuthController extends Controller
 
         Log::info('Datos validados para guardar contacto en Google', $validatedData);
     
-        $googleToken = GoogleToken::where('id_cliente', $id_cliente)->first();
-    
-        if (!$googleToken) {
-            Log::error('No se encontró token para este cliente', ['id_cliente' => $id_cliente]);
-            return response()->json(['message' => 'No se encontró un token para este cliente.'], 404);
+        try {
+            $client = $this->getClientForCustomer($id_cliente);
+        } catch (\Exception $e) {
+            Log::error('Error al obtener cliente de Google en saveContact', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Error de autenticación con Google: ' . $e->getMessage()], 401);
         }
-
-        $expiresIn = $googleToken->expires_at->timestamp - now()->timestamp;
-        Log::info('Tiempo restante antes de expiración del token', ['expires_in' => $expiresIn]);
-    
-        if ($expiresIn <= 0) {
-            Log::info('El token ha expirado. Intentando refrescar el token', ['id_cliente' => $id_cliente]);
-        
-            $client = new Client();
-            $client->setAuthConfig(storage_path('app/google/credentials.json'));
-            $client->setAccessToken([
-                'access_token' => $googleToken->access_token,
-                'refresh_token' => $googleToken->refresh_token,
-                'expires_in' => $expiresIn,
-                'created' => now()->timestamp,
-            ]);
-        
-            if ($client->getRefreshToken()) {
-                $newToken = $client->fetchAccessTokenWithRefreshToken($client->getRefreshToken());
-
-                Log::info('Respuesta al refrescar token (primer intento en saveContact):', $newToken);
-        
-                if (isset($newToken['error'])) {
-                    Log::error('Error al refrescar el token (primer intento saveContact)', ['error' => $newToken['error']]);
-                    return response()->json(['message' => 'No se pudo refrescar el token. Por favor, reautentica.'], 401);
-                }
-        
-                if (!isset($newToken['access_token'])) {
-                    Log::error('No se recibió un access_token al refrescar el token (primer intento saveContact)');
-                    return response()->json(['message' => 'No se recibió un nuevo access_token. Por favor, reautentica.'], 401);
-                }
-
-                Log::info('Token refrescado exitosamente (primer intento saveContact)', [
-                    'new_access_token' => $newToken['access_token'],
-                    'expires_in' => $newToken['expires_in'],
-                ]);
-        
-                $googleToken->access_token = $newToken['access_token'];
-                $googleToken->expires_at = now()->addSeconds($newToken['expires_in']);
-                $googleToken->save();
-            } else {
-                Log::error('No se pudo refrescar el token. El refresh token no está disponible (primer intento saveContact)', ['id_cliente' => $id_cliente]);
-                return response()->json(['message' => 'El token de refresco no está disponible o ha expirado. Por favor, reautentique.'], 401);
-            }
-        }        
-    
-        $client = new Client();
-        $client->setAuthConfig(storage_path('app/google/credentials.json'));
-        $client->setAccessToken([
-            'access_token' => $googleToken->access_token,
-            'refresh_token' => $googleToken->refresh_token,
-            'expires_in' => $expiresIn,
-            'created' => now()->timestamp,
-        ]);
-
-        Log::info('Cliente Google configurado antes de isAccessTokenExpired en saveContact');
-
-        if ($client->isAccessTokenExpired()) {
-            Log::info('El token parece expirado nuevamente. Intentando segundo refresco', ['id_cliente' => $id_cliente]);
-
-            if ($client->getRefreshToken()) {
-                $newToken = $client->fetchAccessTokenWithRefreshToken($client->getRefreshToken());
-
-                Log::info('Respuesta al refrescar token (segundo intento en saveContact):', $newToken);
-                
-                if (isset($newToken['error'])) {
-                    Log::error('Error al refrescar el token (segundo intento saveContact)', ['error' => $newToken['error']]);
-                    return response()->json(['message' => 'No se pudo refrescar el token. Por favor, reautentica.'], 401);
-                }
-                
-                if (!isset($newToken['access_token'])) {
-                    Log::error('No se recibió un access_token al refrescar el token (segundo intento saveContact)');
-                    return response()->json(['message' => 'No se recibió un nuevo access_token. Por favor, reautentica.'], 401);
-                }
-
-                Log::info('Token refrescado exitosamente (segundo intento saveContact)', [
-                    'new_access_token' => $newToken['access_token'],
-                    'expires_in' => $newToken['expires_in'],
-                ]);
-
-                $googleToken->access_token = $newToken['access_token'];
-                $googleToken->expires_at = now()->addSeconds($newToken['expires_in']);
-                $googleToken->save();
-            } else {
-                Log::warning('El refresh token no está disponible o ha expirado (segundo intento saveContact)', ['id_cliente' => $id_cliente]);
-                throw new \Exception('Refresh token not available or expired. Please re-authenticate.');
-            }
-        }        
     
         Log::info('Creando servicio PeopleService en saveContact');
         $peopleService = new PeopleService($client);
